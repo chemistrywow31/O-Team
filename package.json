@@ -1,0 +1,28 @@
+{
+  "name": "o-team-cli",
+  "version": "0.1.0",
+  "description": "O-Team CLI — Multi-team AI agent pipeline orchestrator for Claude Code",
+  "bin": {
+    "o-team-cli": "bin/install.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai-agent",
+    "pipeline",
+    "orchestrator",
+    "skill"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chemistrywow31/O-Team.git"
+  },
+  "files": [
+    "bin/",
+    "skill/"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

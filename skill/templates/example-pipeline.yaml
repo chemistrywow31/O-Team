@@ -1,0 +1,57 @@
+version: "1"
+name: Example Content Pipeline
+slug: example-content-pipeline
+objective: Research a technical topic, produce a design document, write the specification,
+  and review the final output
+created_at: "2026-03-27T00:00:00Z"
+
+nodes:
+  - id: 01-research-team
+    team: research-team
+    team_path: /path/to/your/research-team
+    mode: auto
+    prompt: |
+      Research the topic described in input.md.
+      Gather information from multiple sources, evaluate feasibility,
+      and produce a structured research report covering:
+      - Current state of the art
+      - Available tools and frameworks
+      - Trade-offs and recommendations
+      Write your findings to output.md.
+    timeout: 1800
+
+  - id: 02-design-team
+    team: design-team
+    team_path: /path/to/your/design-team
+    mode: gate
+    prompt: |
+      Based on the research report in input.md, create a technical design.
+      Include architecture decisions, component interactions,
+      and data flow diagrams (using mermaid syntax).
+      Focus on the simplest solution that meets the requirements.
+      Write your design to output.md.
+    timeout: 1800
+
+  - id: 03-writing-team
+    team: writing-team
+    team_path: /path/to/your/writing-team
+    mode: auto
+    prompt: |
+      Transform the technical design in input.md into a complete
+      specification document. Ensure all sections are detailed enough
+      for implementation. Add error handling, edge cases,
+      and deployment considerations.
+      Write the specification to output.md.
+    timeout: 1800
+
+  - id: 04-review-team
+    team: review-team
+    team_path: /path/to/your/review-team
+    mode: gate
+    prompt: |
+      Review the specification document in input.md.
+      Check for: completeness, consistency, implementability,
+      and over-engineering. Produce a review report with
+      categorized issues (blocking vs non-blocking).
+      Write your review to output.md.
+    timeout: 1800

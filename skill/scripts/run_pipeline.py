@@ -1,0 +1,548 @@
+"""O-Team CLI — Pipeline execution engine.
+
+Usage:
+    python -m scripts.run_pipeline <pipeline-yaml>
+        [--input <text-or-file-path>]
+        [--json]
+
+    python -m scripts.run_pipeline --resume <run-id>
+        [--project-dir <path>]
+        [--json]
+
+Creates a UUID sandbox, copies team configurations into office folders,
+assembles prompts, and sequentially spawns independent claude CLI processes.
+Each node runs in its own context with its own team identity.
+"""
+
+import argparse
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from . import utils
+from .validate_pipeline import validate_pipeline
+
+
+# ---------------------------------------------------------------------------
+# Sandbox setup
+# ---------------------------------------------------------------------------
+
+
+def _create_sandbox(pipeline: dict, project_dir: Path) -> dict:
+    """Create a UUID-isolated sandbox for this run.
+
+    Returns the run state dict.
+    """
+    run_id = utils.generate_run_id()
+    runs_dir = project_dir / utils.RUNS_DIR_NAME
+    sandbox = runs_dir / run_id
+
+    # Create sandbox structure
+    sandbox.mkdir(parents=True, exist_ok=True)
+    (sandbox / "workspace").mkdir(exist_ok=True)
+
+    # Create office folders and copy team configs
+    nodes_state = []
+    for node in pipeline["nodes"]:
+        office = sandbox / node["id"]
+        office.mkdir(exist_ok=True)
+
+        # Copy team configuration into office folder
+        team_path = Path(node["team_path"])
+        _copy_team_config(team_path, office)
+
+        nodes_state.append({
+            "id": node["id"],
+            "team": node["team"],
+            "team_path": node["team_path"],
+            "mode": node["mode"],
+            "prompt": node["prompt"],
+            "timeout": node.get("timeout", utils.DEFAULT_TIMEOUT),
+            "state": "PENDING",
+            "exit_code": None,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+        })
+
+    # Save pipeline snapshot
+    utils.write_yaml(sandbox / "snapshot.yaml", pipeline)
+
+    # Build run state
+    run_state = {
+        "run_id": run_id,
+        "pipeline_name": pipeline.get("name", ""),
+        "pipeline_slug": pipeline.get("slug", ""),
+        "state": "PENDING",
+        "nodes": nodes_state,
+        "current_node_index": 0,
+        "sandbox_path": str(sandbox),
+        "created_at": utils.now_iso(),
+        "started_at": None,
+        "finished_at": None,
+    }
+
+    utils.write_json(sandbox / "meta.json", run_state)
+    return run_state
+
+
+def _copy_team_config(team_path: Path, office: Path) -> None:
+    """Copy CLAUDE.md and .claude/ directory into the office folder."""
+    # Copy CLAUDE.md
+    src_claude_md = team_path / "CLAUDE.md"
+    if src_claude_md.exists():
+        shutil.copy2(src_claude_md, office / "CLAUDE.md")
+
+    # Copy .claude/ directory
+    src_claude_dir = team_path / ".claude"
+    dst_claude_dir = office / ".claude"
+    if src_claude_dir.is_dir():
+        if dst_claude_dir.exists():
+            shutil.rmtree(dst_claude_dir)
+        shutil.copytree(src_claude_dir, dst_claude_dir)
+
+
+# ---------------------------------------------------------------------------
+# Prompt assembly
+# ---------------------------------------------------------------------------
+
+
+def _assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
+    """Assemble the complete prompt for a node.
+
+    Combines:
+    1. Context from input.md (if exists)
+    2. Workspace file listing
+    3. Node-specific instructions (from pipeline prompt field)
+    4. Output instruction
+    """
+    office = sandbox / node["id"]
+    workspace = sandbox / "workspace"
+    parts = []
+
+    # Header
+    parts.append(f"# O-Team Pipeline Task")
+    parts.append(f"# Node: {node['id']} | Team: {node['team']}")
+    parts.append("")
+
+    # Context from input.md
+    input_file = office / "input.md"
+    if input_file.exists():
+        input_content = utils.read_text(input_file)
+        if input_content.strip():
+            if is_first_node:
+                parts.append("## Initial Input")
+            else:
+                parts.append("## Context (from previous step)")
+            parts.append("")
+            parts.append(input_content)
+            parts.append("")
+
+    # Workspace listing
+    workspace_files = _list_workspace_files(workspace)
+    if workspace_files:
+        parts.append("## Workspace Files")
+        parts.append("The workspace/ directory contains these shared files:")
+        parts.append("")
+        for wf in workspace_files:
+            parts.append(f"- {wf}")
+        parts.append("")
+        parts.append(f"Workspace path: {workspace}")
+        parts.append("")
+
+    # Node-specific instructions
+    prompt_text = node.get("prompt", "")
+    if prompt_text and prompt_text.strip():
+        parts.append("## Instructions")
+        parts.append("")
+        parts.append(prompt_text.strip())
+        parts.append("")
+
+    # Output instruction
+    parts.append("## Output")
+    parts.append("")
+    parts.append("Write your primary deliverable to output.md in the current directory.")
+    parts.append("Place any supporting files (code, data, diagrams) in the workspace/ directory.")
+    parts.append("")
+
+    return "\n".join(parts)
+
+
+def _list_workspace_files(workspace: Path) -> list[str]:
+    """List files in workspace directory (non-recursive, top level only)."""
+    if not workspace.is_dir():
+        return []
+    files = []
+    for item in sorted(workspace.iterdir()):
+        if item.name.startswith("."):
+            continue
+        if item.is_file():
+            size = item.stat().st_size
+            files.append(f"{item.name} ({_human_size(size)})")
+        elif item.is_dir():
+            count = sum(1 for _ in item.rglob("*") if _.is_file())
+            files.append(f"{item.name}/ ({count} files)")
+    return files
+
+
+def _human_size(size_bytes: int) -> str:
+    """Convert bytes to human-readable size."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if size_bytes < 1024:
+            return f"{size_bytes:.0f}{unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.0f}TB"
+
+
+# ---------------------------------------------------------------------------
+# Node execution
+# ---------------------------------------------------------------------------
+
+
+def _execute_node(node: dict, sandbox: Path, prompt_content: str) -> int:
+    """Execute a single pipeline node by spawning a claude CLI process.
+
+    Returns the exit code of the process.
+    """
+    office = sandbox / node["id"]
+
+    # Write prompt.md for audit trail
+    prompt_file = office / "prompt.md"
+    utils.write_text(prompt_file, prompt_content)
+
+    # Build command
+    # Use claude -p with the prompt file content, run from the office directory
+    cmd = [
+        "claude",
+        "-p", prompt_content,
+        "--dangerously-skip-permissions",
+    ]
+
+    # Open log file
+    log_file = office / "run.log"
+
+    try:
+        with open(log_file, "w", encoding="utf-8") as log_f:
+            process = subprocess.Popen(
+                cmd,
+                cwd=str(office),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,  # Line buffered
+            )
+
+            # Stream output to both terminal and log file
+            for line in process.stdout:
+                sys.stdout.write(line)
+                sys.stdout.flush()
+                log_f.write(line)
+                log_f.flush()
+
+            process.wait()
+            return process.returncode
+
+    except FileNotFoundError:
+        error_msg = "ERROR: 'claude' command not found. Ensure Claude Code CLI is installed.\n"
+        sys.stderr.write(error_msg)
+        with open(log_file, "a", encoding="utf-8") as log_f:
+            log_f.write(error_msg)
+        return 127
+
+    except KeyboardInterrupt:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        return 130
+
+
+# ---------------------------------------------------------------------------
+# Pipeline runner
+# ---------------------------------------------------------------------------
+
+
+def run_pipeline(
+    pipeline_path_str: str | None = None,
+    input_content: str | None = None,
+    resume_run_id: str | None = None,
+    project_dir: Path | None = None,
+) -> dict:
+    """Run a pipeline from start or resume from a paused state.
+
+    Args:
+        pipeline_path_str: Path to pipeline YAML (for new runs)
+        input_content: Initial input text or file path (for new runs)
+        resume_run_id: Run ID to resume (for --resume)
+        project_dir: Project directory (default: cwd)
+
+    Returns:
+        dict with run result
+    """
+    proj_dir = utils.ensure_project_dir(project_dir)
+
+    if resume_run_id:
+        return _resume_run(resume_run_id, proj_dir)
+    else:
+        return _start_new_run(pipeline_path_str, input_content, proj_dir)
+
+
+def _start_new_run(
+    pipeline_path_str: str,
+    input_content: str | None,
+    project_dir: Path,
+) -> dict:
+    """Start a new pipeline run."""
+    # Validate pipeline
+    validation = validate_pipeline(pipeline_path_str)
+    if not validation["valid"]:
+        return {
+            "success": False,
+            "error": "Pipeline 驗證失敗",
+            "validation": validation,
+        }
+
+    pipeline = validation["pipeline"]
+
+    # Create sandbox
+    run_state = _create_sandbox(pipeline, project_dir)
+    sandbox = Path(run_state["sandbox_path"])
+
+    # Write initial input
+    if input_content:
+        first_node_id = run_state["nodes"][0]["id"]
+        input_path = sandbox / first_node_id / "input.md"
+
+        # Check if input_content is a file path
+        potential_file = Path(input_content)
+        if potential_file.exists() and potential_file.is_file():
+            shutil.copy2(potential_file, input_path)
+        else:
+            utils.write_text(input_path, input_content)
+
+    # Start execution
+    return _execute_pipeline(run_state, sandbox)
+
+
+def _resume_run(run_id: str, project_dir: Path) -> dict:
+    """Resume a paused or errored run."""
+    runs_dir = project_dir / utils.RUNS_DIR_NAME
+    sandbox = runs_dir / run_id
+
+    if not sandbox.exists():
+        return {
+            "success": False,
+            "error": f"Run '{run_id}' not found at {sandbox}",
+        }
+
+    meta_file = sandbox / "meta.json"
+    if not meta_file.exists():
+        return {
+            "success": False,
+            "error": f"Run '{run_id}' has no meta.json",
+        }
+
+    run_state = utils.read_json(meta_file)
+
+    if run_state["state"] not in ("PAUSED", "ERROR"):
+        return {
+            "success": False,
+            "error": f"Run '{run_id}' is in state '{run_state['state']}', cannot resume (must be PAUSED or ERROR)",
+        }
+
+    return _execute_pipeline(run_state, sandbox)
+
+
+def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
+    """Execute pipeline nodes sequentially from current position."""
+    run_state["state"] = "RUNNING"
+    run_state["started_at"] = run_state.get("started_at") or utils.now_iso()
+    _save_state(run_state, sandbox)
+
+    nodes = run_state["nodes"]
+    total = len(nodes)
+
+    for i in range(run_state["current_node_index"], total):
+        node = nodes[i]
+        run_state["current_node_index"] = i
+
+        # Skip already completed or skipped nodes
+        if node["state"] in ("COMPLETE", "SKIPPED"):
+            continue
+
+        # Print node header
+        print(f"\n{'='*60}")
+        print(f"▶ Node {i+1}/{total}: {node['id']}")
+        print(f"  Team: {node['team']}")
+        mode_label = "auto ⚡" if node["mode"] == "auto" else "gate ⏸"
+        print(f"  Mode: {mode_label}")
+        print(f"{'='*60}\n")
+
+        # Assemble prompt
+        is_first = (i == 0)
+        prompt_content = _assemble_prompt(node, sandbox, is_first)
+
+        # Execute
+        node["state"] = "RUNNING"
+        node["started_at"] = utils.now_iso()
+        _save_state(run_state, sandbox)
+
+        start_time = time.time()
+        exit_code = _execute_node(node, sandbox, prompt_content)
+        elapsed = time.time() - start_time
+
+        node["exit_code"] = exit_code
+        node["finished_at"] = utils.now_iso()
+
+        if exit_code != 0:
+            node["state"] = "ERROR"
+            node["error"] = f"Exit code: {exit_code}"
+            run_state["state"] = "ERROR"
+            _save_state(run_state, sandbox)
+
+            print(f"\n❌ Node '{node['id']}' failed (exit {exit_code}, {elapsed:.1f}s)")
+            print(f"   Run ID: {run_state['run_id']}")
+            print(f"   操作: python -m scripts.approve_node {run_state['run_id']} {node['id']} retry|skip|abort")
+
+            return {
+                "success": False,
+                "run_id": run_state["run_id"],
+                "state": "ERROR",
+                "failed_node": node["id"],
+                "exit_code": exit_code,
+            }
+
+        # Node succeeded
+        print(f"\n✅ Node '{node['id']}' complete ({elapsed:.1f}s)")
+
+        if node["mode"] == "auto":
+            node["state"] = "COMPLETE"
+            _save_state(run_state, sandbox)
+
+            # Transfer output to next node's input
+            if i + 1 < total:
+                _transfer_output(node, nodes[i + 1], sandbox)
+                print(f"   → auto-proceeding to {nodes[i+1]['id']}")
+
+        elif node["mode"] == "gate":
+            node["state"] = "PAUSED_FOR_REVIEW"
+            run_state["state"] = "PAUSED"
+            _save_state(run_state, sandbox)
+
+            # Show output preview
+            _print_output_preview(node, sandbox)
+
+            print(f"\n⏸  Waiting for review")
+            print(f"   Run ID: {run_state['run_id']}")
+            print(f"   操作:")
+            print(f"     approve: python -m scripts.approve_node {run_state['run_id']} {node['id']} approve")
+            print(f"     reject:  python -m scripts.approve_node {run_state['run_id']} {node['id']} reject")
+            print(f"     abort:   python -m scripts.approve_node {run_state['run_id']} {node['id']} abort")
+
+            return {
+                "success": True,
+                "run_id": run_state["run_id"],
+                "state": "PAUSED",
+                "paused_node": node["id"],
+                "node_index": i,
+                "remaining": total - i - 1,
+            }
+
+    # All nodes complete
+    run_state["state"] = "COMPLETE"
+    run_state["finished_at"] = utils.now_iso()
+    _save_state(run_state, sandbox)
+
+    print(f"\n🏁 Pipeline '{run_state['pipeline_name']}' complete")
+    print(f"   Run ID: {run_state['run_id']}")
+    print(f"   最終產出: {sandbox / nodes[-1]['id'] / 'output.md'}")
+
+    return {
+        "success": True,
+        "run_id": run_state["run_id"],
+        "state": "COMPLETE",
+        "output_path": str(sandbox / nodes[-1]["id"] / "output.md"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _save_state(run_state: dict, sandbox: Path) -> None:
+    """Save run state to meta.json."""
+    utils.write_json(sandbox / "meta.json", run_state)
+
+
+def _transfer_output(from_node: dict, to_node: dict, sandbox: Path) -> None:
+    """Copy output.md from completed node to next node's input.md."""
+    src = sandbox / from_node["id"] / "output.md"
+    dst = sandbox / to_node["id"] / "input.md"
+
+    if src.exists():
+        shutil.copy2(src, dst)
+    else:
+        # No output.md — create empty input for next node
+        utils.write_text(dst, "")
+
+
+def _print_output_preview(node: dict, sandbox: Path, max_lines: int = 20) -> None:
+    """Print a preview of the node's output.md."""
+    output_file = sandbox / node["id"] / "output.md"
+    if not output_file.exists():
+        print("   (無 output.md)")
+        return
+
+    content = utils.read_text(output_file)
+    lines = content.splitlines()
+    preview = lines[:max_lines]
+
+    print(f"\n   ── output.md preview ({len(lines)} lines) ──")
+    for line in preview:
+        print(f"   │ {line}")
+    if len(lines) > max_lines:
+        print(f"   │ ... ({len(lines) - max_lines} more lines)")
+    print(f"   └──────────────────────────────────")
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run a pipeline")
+    parser.add_argument("pipeline", nargs="?", help="Path to pipeline YAML")
+    parser.add_argument("--input", default=None,
+                        help="Initial input (text or file path)")
+    parser.add_argument("--resume", default=None,
+                        help="Resume a paused/errored run by ID")
+    parser.add_argument("--project-dir", default=None,
+                        help="Project directory (default: cwd)")
+    parser.add_argument("--json", action="store_true", default=False)
+    args = parser.parse_args()
+
+    if not args.pipeline and not args.resume:
+        parser.error("Must provide either a pipeline YAML path or --resume <run-id>")
+
+    proj_dir = Path(args.project_dir) if args.project_dir else None
+
+    result = run_pipeline(
+        pipeline_path_str=args.pipeline,
+        input_content=args.input,
+        resume_run_id=args.resume,
+        project_dir=proj_dir,
+    )
+
+    if args.json:
+        utils.print_json(result)
+
+    sys.exit(0 if result.get("success") else 1)
+
+
+if __name__ == "__main__":
+    main()

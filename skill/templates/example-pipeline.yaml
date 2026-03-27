@@ -11,13 +11,9 @@ nodes:
     team_path: /path/to/your/research-team
     mode: auto
     prompt: |
-      Research the topic described in input.md.
-      Gather information from multiple sources, evaluate feasibility,
-      and produce a structured research report covering:
-      - Current state of the art
-      - Available tools and frameworks
-      - Trade-offs and recommendations
-      Write your findings to output.md.
+      根據提供的研究主題，進行完整的資料蒐集與可行性分析。
+      涵蓋：目前技術現況、可用工具與框架、各方案的優缺點比較與建議。
+      產出結構化的研究報告。
     timeout: 1800
 
   - id: 02-design-team
@@ -25,11 +21,9 @@ nodes:
     team_path: /path/to/your/design-team
     mode: gate
     prompt: |
-      Based on the research report in input.md, create a technical design.
-      Include architecture decisions, component interactions,
-      and data flow diagrams (using mermaid syntax).
-      Focus on the simplest solution that meets the requirements.
-      Write your design to output.md.
+      根據前一階段的研究報告，進行技術架構設計。
+      包含：架構決策、元件互動關係、資料流程圖（使用 mermaid 語法）。
+      以滿足需求的最簡方案為原則。
     timeout: 1800
 
   - id: 03-writing-team
@@ -37,11 +31,9 @@ nodes:
     team_path: /path/to/your/writing-team
     mode: auto
     prompt: |
-      Transform the technical design in input.md into a complete
-      specification document. Ensure all sections are detailed enough
-      for implementation. Add error handling, edge cases,
-      and deployment considerations.
-      Write the specification to output.md.
+      將前一階段的技術設計轉化為完整的規格文件。
+      確保每個章節的細節足以直接進入實作階段。
+      補充錯誤處理、邊界情況與部署考量。
     timeout: 1800
 
   - id: 04-review-team
@@ -49,9 +41,7 @@ nodes:
     team_path: /path/to/your/review-team
     mode: gate
     prompt: |
-      Review the specification document in input.md.
-      Check for: completeness, consistency, implementability,
-      and over-engineering. Produce a review report with
-      categorized issues (blocking vs non-blocking).
-      Write your review to output.md.
+      審查前一階段產出的規格文件。
+      檢查：完整性、一致性、可實作性、是否過度工程化。
+      產出審查報告，將問題分為阻塞性與非阻塞性兩類。
     timeout: 1800

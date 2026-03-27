@@ -42,10 +42,9 @@ nodes:
     team_path: /Users/dev/projects/teams/research-team
     mode: auto
     prompt: |
-      Research mainstream SaaS subscription management system architecture patterns.
-      Analyze Stripe Billing, Chargebee, and Recurly technical implementations.
-      Produce a feasibility analysis report covering architecture choices,
-      data models, and integration patterns.
+      根據提供的主題，研究主流 SaaS 訂閱管理系統的架構模式。
+      分析 Stripe Billing、Chargebee、Recurly 的技術實作。
+      產出可行性分析報告，涵蓋架構選型、資料模型與整合模式。
     timeout: 1800
 
   - id: "02-design-team"
@@ -53,11 +52,10 @@ nodes:
     team_path: /Users/dev/projects/teams/design-team
     mode: gate
     prompt: |
-      Based on the research report in input.md, design the system architecture.
-      Include: architecture diagram (mermaid), core API endpoint design,
-      data model definitions (subscription/billing/invoice),
-      and Stripe integration approach.
-      Prioritize proven architecture patterns over novel approaches.
+      根據前一階段的研究報告，進行系統架構設計。
+      包含：架構圖（mermaid）、核心 API 端點設計、
+      資料模型定義（subscription/billing/invoice）、
+      以及 Stripe 整合方案。以穩健成熟的架構模式為優先。
     timeout: 1800
 
   - id: "03-writing-team"
@@ -65,10 +63,8 @@ nodes:
     team_path: /Users/dev/projects/teams/writing-team
     mode: auto
     prompt: |
-      Transform the architecture design in input.md into a complete
-      technical specification document. Follow team formatting standards.
-      Add error handling flows, deployment architecture,
-      and monitoring metrics.
+      將前一階段的架構設計轉化為完整的技術規格文件。
+      遵循團隊格式規範。補充錯誤處理流程、部署架構與監控指標。
     timeout: 1800
 
   - id: "04-review-team"
@@ -76,10 +72,10 @@ nodes:
     team_path: /Users/dev/projects/teams/review-team
     mode: gate
     prompt: |
-      Review the technical specification in input.md.
-      Verify: API design consistency, data model completeness,
-      over-engineering detection, missing edge cases.
-      Produce a review report with blocking and non-blocking issues.
+      審查前一階段產出的技術規格文件。
+      驗證：API 設計一致性、資料模型完整性、
+      是否過度工程化、遺漏的邊界情況。
+      產出審查報告，將問題分為阻塞性與非阻塞性兩類。
     timeout: 1800
 ```
 

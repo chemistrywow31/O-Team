@@ -149,9 +149,10 @@ This ensures `.o-team/` data (pipelines, runs) is created in the project root, n
   - The handoff relationship (previous team's likely output → this team's expected input)
 - Generate a specific, actionable prompt for each subsequent node
 - Each prompt must:
-  - Reference input.md as the source of context from the previous step
+  - NOT reference input.md or output.md — the system automatically injects input context into the prompt and appends output instructions
+  - For Node 1: reference the input contextually (e.g., "根據提供的研究主題") since user's initial input is injected as "## Initial Input"
+  - For subsequent nodes: reference the previous step contextually (e.g., "根據前一階段的調查報告") since it is injected as "## Context (from previous step)"
   - State clearly what deliverable to produce
-  - Instruct to write the primary deliverable to output.md
   - Be concise but specific (3-8 sentences)
 
 **Step 7: Present all prompts for confirmation**
@@ -352,7 +353,7 @@ Each pipeline node spawns a **separate `claude` CLI process**. The orchestrating
 - Starts with a fresh context window
 - Loads its own team's CLAUDE.md and .claude/ configuration
 - Has no knowledge of other nodes or the overall pipeline
-- Receives upstream information only through input.md
+- Receives upstream information through prompt injection (input.md content is automatically embedded in the assembled prompt)
 - Produces output.md as its deliverable
 
 ### Office Folder Structure
@@ -362,7 +363,7 @@ Each node's office folder is a complete, self-contained team environment:
 {run-id}/{node-id}/
 ├── CLAUDE.md        ← copied from team
 ├── .claude/         ← copied from team
-├── input.md         ← handoff from previous node
+├── input.md         ← handoff from previous node (injected into prompt)
 ├── output.md        ← this node's deliverable
 ├── prompt.md        ← assembled prompt (audit trail)
 └── run.log          ← CLI output log
@@ -371,11 +372,11 @@ Each node's office folder is a complete, self-contained team environment:
 ### Artifact Flow
 
 ```
-Node 1: reads input.md → produces output.md
-         ↓ (orchestrator copies output → next input)
-Node 2: reads input.md → produces output.md
-         ↓
-Node 3: reads input.md → produces output.md (final deliverable)
+User input → injected into Node 1 prompt → produces output.md
+              ↓ (orchestrator copies output → next node's prompt)
+Node 2: receives context via prompt → produces output.md
+              ↓
+Node 3: receives context via prompt → produces output.md (final deliverable)
 ```
 
 ### Storage

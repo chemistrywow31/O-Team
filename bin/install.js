@@ -162,6 +162,12 @@ if (isUninstall) {
   } else {
     console.log(`  ⚠️  Not installed at: ${TARGET_DIR}`);
   }
+  // Also remove commands
+  const cmdDir = path.join(process.cwd(), ".claude", "commands", "o-team");
+  if (fs.existsSync(cmdDir)) {
+    fs.rmSync(cmdDir, { recursive: true });
+    console.log(`  ✅ Removed commands: ${cmdDir}`);
+  }
   console.log("");
   process.exit(0);
 }
@@ -194,6 +200,25 @@ try {
 } catch (err) {
   console.error(`  ❌ Failed to copy files: ${err.message}`);
   process.exit(1);
+}
+
+// Copy command files to .claude/commands/o-team/
+const COMMANDS_SRC = path.join(TARGET_DIR, "commands");
+const COMMANDS_DIR = path.join(process.cwd(), ".claude", "commands", "o-team");
+
+try {
+  if (fs.existsSync(COMMANDS_SRC)) {
+    fs.mkdirSync(COMMANDS_DIR, { recursive: true });
+    for (const file of fs.readdirSync(COMMANDS_SRC)) {
+      fs.copyFileSync(
+        path.join(COMMANDS_SRC, file),
+        path.join(COMMANDS_DIR, file)
+      );
+    }
+    console.log("  ✅ Commands installed to .claude/commands/o-team/");
+  }
+} catch (err) {
+  console.log(`  ⚠️  Failed to install commands: ${err.message}`);
 }
 
 // Check Python

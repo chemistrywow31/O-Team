@@ -122,14 +122,21 @@ O-Team CLI **consumes** these team folders and lets you register, build pipeline
 
 | Command | Description |
 |---------|-------------|
-| `/o-team:registry add <path>` | Register team folder(s) |
-| `/o-team:registry list` | List registered teams |
-| `/o-team:registry remove <slug>` | Remove a registered team |
+| **Team Registry** | |
+| `/o-team:registry add <path>` | Register team folder(s) — auto-registers all valid teams |
+| `/o-team:registry list` | List registered teams with summary and capabilities |
+| `/o-team:registry remove <slug>` | Remove a registered team by slug |
+| **Pipeline Management** | |
 | `/o-team:build` | Build a named pipeline interactively |
-| `/o-team:run <pipeline-name>` | Execute a pipeline |
-| `/o-team:status <run-id>` | Check run status |
-| `/o-team:runs` | List run history |
+| `/o-team:pipeline list` | List all saved pipelines |
+| `/o-team:pipeline show <name>` | Show pipeline details (nodes, prompts, modes) |
+| `/o-team:pipeline remove <name>` | Delete a saved pipeline |
+| **Execution** | |
+| `/o-team:run <pipeline-name>` | Execute a pipeline with stream-json event tracking |
+| `/o-team:status <run-id>` | Check run status and per-node progress |
+| `/o-team:runs` | List run history with state and timestamps |
 | `/o-team:clean [run-id]` | Clean up run directories |
+| **Settings** | |
 | `/o-team:config` | Interactive settings (statusline, language) |
 
 ---
@@ -584,14 +591,21 @@ O-Team CLI **消費**這些團隊資料夾，讓你可以：
 
 | 指令 | 說明 |
 |------|------|
-| `/o-team:registry add <path>` | 註冊團隊資料夾 |
-| `/o-team:registry list` | 列出已註冊團隊 |
-| `/o-team:registry remove <slug>` | 移除已註冊團隊 |
+| **團隊註冊** | |
+| `/o-team:registry add <path>` | 註冊團隊資料夾 — 自動註冊所有合法團隊 |
+| `/o-team:registry list` | 列出已註冊團隊（含摘要與能力標籤） |
+| `/o-team:registry remove <slug>` | 依 slug 移除已註冊團隊 |
+| **流水線管理** | |
 | `/o-team:build` | 互動式建構命名流水線 |
-| `/o-team:run <pipeline-name>` | 執行流水線 |
-| `/o-team:status <run-id>` | 查詢執行狀態 |
-| `/o-team:runs` | 列出執行歷史 |
+| `/o-team:pipeline list` | 列出所有已儲存的流水線 |
+| `/o-team:pipeline show <name>` | 顯示流水線詳情（節點、Prompt、模式） |
+| `/o-team:pipeline remove <name>` | 刪除已儲存的流水線 |
+| **執行** | |
+| `/o-team:run <pipeline-name>` | 執行流水線（stream-json 事件追蹤） |
+| `/o-team:status <run-id>` | 查詢執行狀態與逐節點進度 |
+| `/o-team:runs` | 列出執行歷史（含狀態與時間戳） |
 | `/o-team:clean [run-id]` | 清理執行目錄 |
+| **設定** | |
 | `/o-team:config` | 互動式設定（狀態列、語系） |
 
 ---

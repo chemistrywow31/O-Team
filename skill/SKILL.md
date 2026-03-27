@@ -43,6 +43,7 @@ Enable users to register A-Team generated agent teams, build named execution pip
 | `/o-team:status <run-id>` | Check run status |
 | `/o-team:runs` | List run history |
 | `/o-team:clean [run-id]` | Clean up run directories |
+| `/o-team:pipeline list\|show\|remove` | Manage saved pipelines |
 | `/o-team:config` | Configure O-Team settings (statusline, etc.) |
 
 ## Script Location

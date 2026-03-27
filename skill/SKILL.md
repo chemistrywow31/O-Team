@@ -75,10 +75,9 @@ Set `cwd` to the directory containing this SKILL.md (the o-team skill root) when
 
 **Multi-team directory mode** (path has no CLAUDE.md):
 - Script scans subdirectories, returns candidates (valid teams) and warnings (subdirectories without CLAUDE.md)
-- Present ALL results to the user — both valid candidates and warnings
-- Warnings for subdirectories without CLAUDE.md MUST be shown (not silently skipped)
-- Ask the user which candidates to register (all or select by number)
-- For selected teams, run `python -m scripts.registry register-selected <path1> <path2> ... --json`
+- **Register ALL valid candidates automatically** — do NOT ask the user to select
+- Run `python -m scripts.registry register-selected <path1> <path2> ... --json` with all candidate paths
+- Show warnings for invalid subdirectories (no CLAUDE.md) but continue
 - For each registered team, read its CLAUDE.md and generate summary + capabilities as above
 
 ### Presentation Format

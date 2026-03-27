@@ -39,10 +39,10 @@ Parse the argument to determine the action: `add <path>`, `list`, or `remove <sl
    - Update: `python -m scripts.registry update <slug> --summary "..." --capabilities "kw1,kw2,kw3" --json`
 3. **Multi-team directory mode** (no CLAUDE.md):
    - Script scans subdirectories, returns candidates and warnings
-   - Present ALL results — both valid candidates AND warnings
-   - Ask which to register (all or select by number)
-   - For selected: `python -m scripts.registry register-selected <path1> <path2> ... --json`
-   - Generate summary + capabilities for each
+   - **Register ALL valid candidates automatically** — do NOT ask the user to select
+   - Run `python -m scripts.registry register-selected <path1> <path2> ... --json` with all candidate paths
+   - Show warnings for invalid subdirectories (no CLAUDE.md) but continue
+   - Generate summary + capabilities for each registered team
 
 ### list
 

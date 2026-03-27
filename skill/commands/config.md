@@ -10,7 +10,7 @@ allowed-tools:
 
 # O-Team Config
 
-First-time in this session? Show the O-Team banner.
+First-time in this session? Show: **O-Team | Agent Office**
 
 ## Script Location
 

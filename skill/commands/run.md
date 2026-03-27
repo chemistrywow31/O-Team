@@ -13,7 +13,7 @@ allowed-tools:
 
 # O-Team Run Pipeline
 
-First-time in this session? Show the O-Team banner.
+First-time in this session? Show: **O-Team | Agent Office**
 
 ## Script Location
 

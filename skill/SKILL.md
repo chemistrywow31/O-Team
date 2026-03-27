@@ -7,18 +7,9 @@ description: Orchestrate multi-team AI agent pipelines via CLI. Use when user wa
 
 ## Banner
 
-**The first time any `/o-team:*` command is triggered in a session**, display this banner before proceeding:
+**The first time any `/o-team:*` command is triggered in a session**, display this before proceeding:
 
-```
-   ___        _____
-  / _ \      |_   _|__  __ _ _ __ ___
- | | | |_____  | |/ _ \/ _` | '_ ` _ \
- | |_| |_____| | |  __/ (_| | | | | | |
-  \___/        |_|\___|\__,_|_| |_| |_|
-                Agent Office
-
-  Multi-team AI Agent Pipeline Orchestrator
-```
+**O-Team | Agent Office**
 
 Only show this banner **once per session** (not on every command). After the banner, proceed with the command normally.
 

@@ -13,15 +13,7 @@ allowed-tools:
 
 # O-Team Registry
 
-First-time in this session? Show the O-Team banner:
-```
-   ___        _____
-  / _ \      |_   _|__  __ _ _ __ ___
- | | | |_____  | |/ _ \/ _` | '_ ` _ \
- | |_| |_____| | |  __/ (_| | | | | | |
-  \___/        |_|\___|\__,_|_| |_| |_|
-                Agent Office
-```
+First-time in this session? Show: **O-Team | Agent Office**
 
 ## Script Location
 

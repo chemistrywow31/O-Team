@@ -151,8 +151,15 @@ const args = process.argv.slice(2);
 const isUninstall = args.includes("--uninstall") || args.includes("uninstall");
 
 console.log("");
-console.log("  O-Team CLI — Multi-team AI Agent Pipeline Orchestrator");
-console.log("  ======================================================");
+console.log("     ___        _____");
+console.log("    / _ \\      |_   _|__  __ _ _ __ ___");
+console.log("   | | | |_____  | |/ _ \\/ _` | '_ ` _ \\");
+console.log("   | |_| |_____| | |  __/ (_| | | | | | |");
+console.log("    \\___/        |_|\\___|\\__,_|_| |_| |_|");
+console.log("                  Agent Office");
+console.log("");
+console.log("  Multi-team AI Agent Pipeline Orchestrator");
+console.log("  ─────────────────────────────────────────");
 console.log("");
 
 if (isUninstall) {

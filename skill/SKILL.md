@@ -66,19 +66,22 @@ Set `cwd` to the directory containing this SKILL.md (the o-team skill root) when
 1. Run `python -m scripts.registry add <path> --json`
 2. Parse the JSON result. Two modes:
 
-**Single team mode** (path contains CLAUDE.md):
-- Script validates and registers the team
-- If successful, read the team's CLAUDE.md and .claude/agents/ structure
-- Generate a `summary` (one sentence describing the team's purpose) and `capabilities` (list of 3-5 keywords)
-- Update the registry entry: `python -m scripts.registry update <slug> --summary "..." --capabilities "kw1,kw2,kw3" --json`
+**Single team mode** (response has `"mode": "single"`):
+- The response contains `team.slug` — use THIS slug for all subsequent commands
+- Read the team's CLAUDE.md and .claude/agents/ structure
+- Generate a `summary` (one sentence) and `capabilities` (3-5 keywords)
+- Update using the slug FROM THE RESPONSE: `python -m scripts.registry update <team.slug> --summary "..." --capabilities "kw1,kw2,kw3" --json`
 - Present the result to the user
 
-**Multi-team directory mode** (path has no CLAUDE.md):
-- Script scans subdirectories, returns candidates (valid teams) and warnings (subdirectories without CLAUDE.md)
-- **Register ALL valid candidates automatically** — do NOT ask the user to select
+**Multi-team directory mode** (response has `"mode": "multi"`):
+- Response contains `candidates` (valid) and `warnings` (invalid subdirs)
+- **Register ALL candidates automatically** — do NOT ask the user to select
 - Run `python -m scripts.registry register-selected <path1> <path2> ... --json` with all candidate paths
-- Show warnings for invalid subdirectories (no CLAUDE.md) but continue
-- For each registered team, read its CLAUDE.md and generate summary + capabilities as above
+- Response contains `results` array — each successful result has `result.team.slug`
+- **IMPORTANT**: Use slug from `result.team.slug`, NOT the folder name. Slugs come from the CLAUDE.md title.
+- For each registered team, generate summary + capabilities and update **one at a time** (not in parallel):
+  `python -m scripts.registry update <result.team.slug> --summary "..." --capabilities "kw1,kw2" --json`
+- Show warnings for invalid subdirectories but continue
 
 ### Presentation Format
 

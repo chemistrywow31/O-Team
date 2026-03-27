@@ -32,17 +32,20 @@ Parse the argument to determine the action: `add <path>`, `list`, or `remove <sl
 ### add <path>
 
 1. Run `python -m scripts.registry add <path> --json`
-2. **Single team mode** (path contains CLAUDE.md):
-   - Script validates and registers the team
+2. **Single team mode** (response has `"mode": "single"`):
+   - The response contains `team.slug` — use THIS slug for all subsequent commands
    - Read the team's CLAUDE.md and .claude/agents/ structure
    - Generate a `summary` (one sentence) and `capabilities` (3-5 keywords)
-   - Update: `python -m scripts.registry update <slug> --summary "..." --capabilities "kw1,kw2,kw3" --json`
-3. **Multi-team directory mode** (no CLAUDE.md):
-   - Script scans subdirectories, returns candidates and warnings
-   - **Register ALL valid candidates automatically** — do NOT ask the user to select
+   - Update using the slug FROM THE RESPONSE: `python -m scripts.registry update <team.slug> --summary "..." --capabilities "kw1,kw2,kw3" --json`
+3. **Multi-team directory mode** (response has `"mode": "multi"`):
+   - The response contains `candidates` (valid teams) and `warnings` (invalid subdirs)
+   - **Register ALL candidates automatically** — do NOT ask the user to select
    - Run `python -m scripts.registry register-selected <path1> <path2> ... --json` with all candidate paths
-   - Show warnings for invalid subdirectories (no CLAUDE.md) but continue
-   - Generate summary + capabilities for each registered team
+   - The response contains `results` array — each successful result has `result.team.slug`
+   - **IMPORTANT**: Use the slug from each result (`result.team.slug`), NOT the folder name. Slugs are derived from the CLAUDE.md title, not the folder name.
+   - For each successfully registered team, generate summary + capabilities and update **one at a time** (not in parallel):
+     `python -m scripts.registry update <result.team.slug> --summary "..." --capabilities "kw1,kw2" --json`
+   - Show warnings for invalid subdirectories but continue
 
 ### list
 

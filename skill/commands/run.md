@@ -27,31 +27,43 @@ PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
 
 ## Flow
 
+**Use AskUserQuestion for user interaction steps.** Do NOT use free-form text conversation.
+
 **Step 1: Locate pipeline**
 - Look for `.o-team/pipelines/<pipeline-name>.yaml`
 - If not found, try slugified version
-- If still not found, list `.o-team/pipelines/` and suggest matches
+- If still not found, list `.o-team/pipelines/` and use AskUserQuestion to let user pick
 
 **Step 2: Validate pipeline**
-- Run `python -m scripts.validate_pipeline <path> --json`
+- Run `PYTHONPATH=.claude/skills/o-team python -m scripts.validate_pipeline <path> --json`
 
 **Step 3: Get initial input**
-- Ask user for initial input (text, file path, or "none")
+- Use AskUserQuestion:
+  - Question: "Provide initial input for the first node:"
 
 **Step 4: Execute**
-- Run `python -m scripts.run_pipeline <pipeline-yaml> --input "<input>" --json`
+- Run `PYTHONPATH=.claude/skills/o-team python -m scripts.run_pipeline <pipeline-yaml> --input "<input>" --json`
 - The script handles sandbox creation, prompt assembly, stream-json parsing, and execution
 
 **Step 5: Handle gate pauses**
-When state is PAUSED, ask user:
-- **approve** → `python -m scripts.approve_node <run-id> <node-id> approve --json` then `python -m scripts.run_pipeline --resume <run-id> --json`
-- **reject** → `python -m scripts.approve_node <run-id> <node-id> reject --json` then resume
-- **edit** → let user modify output.md, then approve
-- **skip** → `python -m scripts.approve_node <run-id> <node-id> skip --json` then resume
-- **abort** → `python -m scripts.approve_node <run-id> <node-id> abort --json`
+When state is PAUSED, show output preview then use AskUserQuestion:
+- Question: "Review node output. What would you like to do?"
+- Options:
+  - "Approve — accept and continue"
+  - "Reject — discard and re-run this node"
+  - "Edit — modify output.md then continue"
+  - "Skip — skip this node"
+  - "Abort — cancel entire pipeline"
+- Apply:
+  - Approve → `PYTHONPATH=.claude/skills/o-team python -m scripts.approve_node <run-id> <node-id> approve --json` then resume
+  - Reject → `... reject --json` then resume
+  - Edit → let user modify output.md, then approve
+  - Skip → `... skip --json` then resume
+  - Abort → `... abort --json`
 
 **Step 6: Handle errors**
-When state is ERROR, show error and ask: retry, skip, or abort
+When state is ERROR, show error then use AskUserQuestion:
+- Options: "Retry" / "Skip" / "Abort"
 
 **Step 7: Pipeline complete**
 Show final output location, offer to display output.md

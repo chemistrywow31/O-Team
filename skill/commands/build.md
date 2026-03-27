@@ -26,43 +26,67 @@ PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
 
 ## Flow
 
+**Use AskUserQuestion for EVERY user interaction step.** Do NOT use free-form text conversation. Each step should present clear selectable options.
+
 **Step 1: List registered teams**
-- Run `python -m scripts.registry list --json`
+- Run `PYTHONPATH=.claude/skills/o-team python -m scripts.registry list --json`
 - Present numbered list with summaries and capabilities
-- If no teams registered, tell user to register first
+- If no teams registered, tell user to register first and stop
 
-**Step 2: Select and order**
-- Ask user to select teams by number, in execution order (comma-separated)
-- Example: "1,3,2" means team 1 first, then team 3, then team 2
+**Step 2: Select teams**
+- Use AskUserQuestion:
+  - Question: "Select teams for this pipeline (enter numbers in execution order, comma-separated, e.g. 1,3,2)"
+  - Show the numbered team list as context before the question
 
-**Step 3: Set execution mode per node**
-- For each selected team, ask: auto or gate?
-- Default: gate for last node, auto for others
+**Step 3: Set execution mode**
+- Show default modes as a table: auto for all nodes except last (gate)
+- Use AskUserQuestion:
+  - Question: "Execution modes:"
+  - Options:
+    - "Use defaults (auto → ... → gate)"
+    - "Customize modes"
+- If "Customize": for each node, use AskUserQuestion with options "auto" / "gate"
 
 **Step 4: Name the pipeline**
-- Ask user for a pipeline name
+- Use AskUserQuestion:
+  - Question: "Pipeline name:"
 
-**Step 5: Get objective and first node prompt**
-- Ask: "What is the overall objective of this pipeline?"
-- Ask: "What should the first node do?"
+**Step 5: Objective and first node prompt**
+- Use AskUserQuestion:
+  - Question: "What is the overall objective of this pipeline?"
+- Use AskUserQuestion:
+  - Question: "What should the first node do? (starting prompt)"
 
-**Step 6: Auto-generate prompts for remaining nodes**
-- Read each team's CLAUDE.md
-- Generate specific prompts based on objective, capabilities, and position
+**Step 6: Auto-generate prompts**
+- Read each team's CLAUDE.md from their team_path
+- Generate specific prompts for all subsequent nodes based on:
+  - Pipeline objective
+  - First node prompt
+  - Each team's capabilities
+  - Position in the pipeline and handoff relationship
 - Each prompt must reference input.md and instruct to write to output.md
 
-**Step 7: Present all prompts for confirmation**
+**Step 7: Review prompts**
+- Present complete pipeline with all prompts:
 ```
-Pipeline: tech-spec-pipeline
+Pipeline: {name}
 Objective: {objective}
 
-  Node 1 — research-team [auto]
+  Node 1 — {team} [auto]
   Prompt: {prompt text}
 
-  Node 2 — design-team [gate]
+  Node 2 — {team} [gate]
   Prompt: {prompt text}
 ```
+- Use AskUserQuestion:
+  - Question: "Confirm pipeline?"
+  - Options:
+    - "Confirm and save"
+    - "Modify a node (specify node number)"
+    - "Cancel"
+- If "Modify": ask which node, let user edit that prompt, then re-present
 
 **Step 8: Generate pipeline YAML**
 - Assemble nodes JSON and run:
-  `python -m scripts.create_pipeline --name "<name>" --objective "<objective>" --nodes '<json>' --json`
+  `PYTHONPATH=.claude/skills/o-team python -m scripts.create_pipeline --name "<name>" --objective "<objective>" --nodes '<json>' --json`
+- Show result with file path

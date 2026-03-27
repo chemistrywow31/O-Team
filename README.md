@@ -15,6 +15,37 @@
 
 **[English](#english)** | **[繁體中文](#繁體中文)**
 
+### Quick Start
+
+```bash
+# Install
+cd your-project
+npx github:chemistrywow31/O-Team
+
+# Optional: set up statusline (choose one)
+npx github:chemistrywow31/O-Team --force --statusline merge    # claude-hud users
+npx github:chemistrywow31/O-Team --force --statusline o-team   # no existing statusline
+```
+
+```bash
+# Use in Claude Code
+claude
+
+/o-team:registry add ./teams     # Register your A-Team agent teams
+/o-team:build                    # Build a pipeline interactively
+/o-team:run my-pipeline          # Run it
+/o-team:config                   # Configure statusline & language
+```
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  A-Team #1  │───▶│  A-Team #2  │───▶│  A-Team #3  │───▶│  A-Team #4  │
+│  Research   │    │  Design     │    │  Writing    │    │  QA Review  │
+│ output.md ──│───▶│── input.md  │    │ output.md ──│───▶│── input.md  │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+       Each node = independent claude process with fresh context
+```
+
 ---
 
 <a id="english"></a>
@@ -45,24 +76,7 @@ The result: multi-team AI pipelines where quality doesn't degrade as complexity 
 
 [A-Team](https://github.com/chemistrywow31/A-Team) generates specialized AI agent team folders — each containing a `CLAUDE.md` definition and `.claude/agents/` with role-specific agents.
 
-O-Team CLI **consumes** these team folders and lets you:
-
-1. **Register** teams from local paths (single folder or batch scan)
-2. **Build** named pipelines by selecting and ordering teams
-3. **Run** pipelines with per-node prompt injection and automatic context handoff
-4. **Review** outputs at gate nodes before proceeding
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  A-Team #1  │───▶│  A-Team #2  │───▶│  A-Team #3  │───▶│  A-Team #4  │
-│  Research   │    │  Design     │    │  Writing    │    │  QA Review  │
-│             │    │             │    │             │    │             │
-│ output.md ──│───▶│── input.md  │    │ output.md ──│───▶│── input.md  │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-      ▲                                                        │
-      │            Each node = independent claude process      │
-      └──────────── Human review gate at every step ───────────┘
-```
+O-Team CLI **consumes** these team folders and lets you register, build pipelines, run them with automatic handoff, and review outputs at gate nodes.
 
 ### Features
 
@@ -408,25 +422,6 @@ pip install pyyaml
 # Copy statusline scripts manually:
 cp .claude/skills/o-team/scripts/statusline.py ~/.o-team/
 cp .claude/skills/o-team/scripts/statusline_standalone.py ~/.o-team/
-```
-
-### Quick Start
-
-```bash
-# 1. Start Claude Code in your project
-claude
-
-# 2. Register your agent teams
-/o-team:registry add ./teams
-
-# 3. Build a pipeline
-/o-team:build
-
-# 4. Run it
-/o-team:run my-pipeline
-
-# 5. (Optional) Configure statusline and language
-/o-team:config
 ```
 
 ### O-Team Web vs O-Team CLI
@@ -797,25 +792,6 @@ npx github:chemistrywow31/O-Team --statusline keep      # 不動 statusline
 ```bash
 npx github:chemistrywow31/O-Team --force       # 覆蓋現有安裝
 npx github:chemistrywow31/O-Team --uninstall   # 移除 skill
-```
-
-### 快速開始
-
-```bash
-# 1. 在你的專案中啟動 Claude Code
-claude
-
-# 2. 註冊你的 agent 團隊
-/o-team:registry add ./teams
-
-# 3. 建構流水線
-/o-team:build
-
-# 4. 執行
-/o-team:run my-pipeline
-
-# 5.（選用）設定狀態列和語系
-/o-team:config
 ```
 
 ### O-Team Web 版 vs O-Team CLI 版

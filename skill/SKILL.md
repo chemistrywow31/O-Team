@@ -5,6 +5,37 @@ description: Orchestrate multi-team AI agent pipelines via CLI. Use when user wa
 
 # O-Team Pipeline Orchestrator
 
+## Banner
+
+**The first time any `/o-team:*` command is triggered in a session**, display this banner before proceeding:
+
+```
+   ___        _____
+  / _ \      |_   _|__  __ _ _ __ ___
+ | | | |_____  | |/ _ \/ _` | '_ ` _ \
+ | |_| |_____| | |  __/ (_| | | | | | |
+  \___/        |_|\___|\__,_|_| |_| |_|
+                Agent Office
+
+  Multi-team AI Agent Pipeline Orchestrator
+```
+
+Only show this banner **once per session** (not on every command). After the banner, proceed with the command normally.
+
+## i18n (Internationalization)
+
+O-Team supports English (en) and Traditional Chinese (zh-TW).
+
+**Language detection** (run `python -m scripts.config detect --json` to check):
+1. `~/.o-team/config.json` → `"language"` field (user override via `/o-team:config`)
+2. `~/.claude/settings.json` → `"language"` field
+3. System `LANG` / `LC_ALL` environment variable
+4. Fallback: English
+
+**For Claude (the orchestrator)**: After detecting the language, adapt your own response text to match. If zh-TW, respond in Traditional Chinese. If en, respond in English. The banner ASCII art is always English, but the subtitle line should match the locale.
+
+**For script output**: Scripts use the `i18n.t()` function internally.
+
 ## Purpose
 
 Enable users to register A-Team generated agent teams, build named execution pipelines by selecting and ordering teams, and run pipelines where each node operates in isolated context with its own team identity. Teams collaborate exclusively through handoff files (input.md / output.md).
@@ -21,6 +52,7 @@ Enable users to register A-Team generated agent teams, build named execution pip
 | `/o-team:status <run-id>` | Check run status |
 | `/o-team:runs` | List run history |
 | `/o-team:clean [run-id]` | Clean up run directories |
+| `/o-team:config` | Configure O-Team settings (statusline, etc.) |
 
 ## Script Location
 
@@ -238,6 +270,83 @@ Objective: {objective}
 - With run-id: run `python -m scripts.clean_runs <run-id> --json`
 - With "all": run `python -m scripts.clean_runs --all --json`
 - With state filter: run `python -m scripts.clean_runs --state COMPLETE --json`
+
+---
+
+## /o-team:config
+
+Interactive configuration for O-Team settings.
+
+### Flow
+
+**Step 1: Detect current state**
+- Run `python -m scripts.config detect --json`
+- Parse the result to understand current statusline configuration
+
+**Step 2: Show current config**
+- Present current state to user in a clear format:
+
+```
+📊 O-Team 設定
+
+Statusline: {state description}
+  └ {current command preview or "未設定"}
+```
+
+State descriptions:
+- `current = "none"` → "未設定 statusline"
+- `current = "claude-hud"` → "claude-hud（可合併 O-Team 狀態）"
+- `current = "o-team-merged"` → "claude-hud + O-Team（已合併）"
+- `current = "o-team"` → "O-Team 獨立 statusline"
+- `current = "other"` → "其他 statusline 工具（不支援合併）"
+
+**Step 3: Ask what to configure**
+- Use AskUserQuestion to ask what the user wants to configure
+- Options (use i18n translated text):
+  - "Statusline setup" — configure status bar
+  - "Language / 語系" — switch language
+  - "Done" — exit config
+
+**Step 4: Statusline configuration (if selected)**
+- Based on detected state, present appropriate options via AskUserQuestion:
+
+**If `current = "claude-hud"`:**
+- "合併 — 在 claude-hud 旁顯示 O-Team pipeline 狀態（推薦）"
+- "替換 — 改用 O-Team 獨立 statusline"
+- "保持 — 不變更"
+
+**If `current = "o-team-merged"`:**
+- "已設定完成，O-Team 狀態會顯示在 claude-hud 旁"
+- "替換 — 改用 O-Team 獨立 statusline"
+- "移除 — 還原為原本的 claude-hud"
+
+**If `current = "o-team"`:**
+- "已使用 O-Team 獨立 statusline"
+- "還原 — 恢復先前的 statusline"
+
+**If `current = "other"`:**
+- "替換 — 改用 O-Team 獨立 statusline"
+- "保持 — 不變更（pipeline 狀態僅記錄在 log 中）"
+
+**If `current = "none"`:**
+- "啟用 — 使用 O-Team 獨立 statusline（推薦）"
+- "跳過 — 不設定"
+
+**Step 5: Apply statusline choice**
+- Map the user's selection to a choice:
+  - Merge → `python -m scripts.config apply merge --json`
+  - Replace/Enable → `python -m scripts.config apply o-team --json`
+  - Keep/Skip → `python -m scripts.config apply keep --json`
+  - Restore/Remove → `python -m scripts.config apply restore --json`
+- Parse result and present confirmation to user
+- If changed, mention that a Claude Code restart is needed
+
+**Step 4b: Language configuration (if "Language" selected in Step 3)**
+- Use AskUserQuestion:
+  - "English"
+  - "繁體中文 (Traditional Chinese)"
+- Apply choice: `python -m scripts.config set-language <en|zh-TW> --json`
+- Confirm the change and switch response language immediately
 
 ---
 

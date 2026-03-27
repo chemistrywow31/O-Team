@@ -15,6 +15,7 @@ Each node runs in its own context with its own team identity.
 """
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,17 @@ import time
 from pathlib import Path
 
 from . import utils
+from .stream_parser import (
+    StreamParser,
+    StatusSnapshot,
+    CompleteMessage,
+    StreamMessage,
+    format_status_line,
+    is_complete,
+    write_status,
+    clear_status,
+    STATUS_FILE_NAME,
+)
 from .validate_pipeline import validate_pipeline
 
 
@@ -201,8 +213,17 @@ def _human_size(size_bytes: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _execute_node(node: dict, sandbox: Path, prompt_content: str) -> int:
+def _execute_node(
+    node: dict,
+    sandbox: Path,
+    prompt_content: str,
+    run_state: dict,
+    status_path: Path,
+) -> int:
     """Execute a single pipeline node by spawning a claude CLI process.
+
+    Uses --output-format stream-json to receive structured events.
+    Parses events to update the status line and log file.
 
     Returns the exit code of the process.
     """
@@ -212,19 +233,36 @@ def _execute_node(node: dict, sandbox: Path, prompt_content: str) -> int:
     prompt_file = office / "prompt.md"
     utils.write_text(prompt_file, prompt_content)
 
-    # Build command
-    # Use claude -p with the prompt file content, run from the office directory
+    # Build command with stream-json output
     cmd = [
         "claude",
         "-p", prompt_content,
+        "--output-format", "stream-json",
+        "--verbose",
         "--dangerously-skip-permissions",
     ]
 
-    # Open log file
+    # File paths
     log_file = office / "run.log"
+    events_file = office / "events.jsonl"
+
+    # Status tracking
+    parser = StreamParser()
+    status = StatusSnapshot(
+        run_id=run_state["run_id"],
+        pipeline_name=run_state.get("pipeline_name", ""),
+        node_id=node["id"],
+        node_index=run_state["current_node_index"],
+        total_nodes=len(run_state["nodes"]),
+        team=node["team"],
+        phase="running",
+    )
+    result_text = ""
 
     try:
-        with open(log_file, "w", encoding="utf-8") as log_f:
+        with open(log_file, "w", encoding="utf-8") as log_f, \
+             open(events_file, "w", encoding="utf-8") as evt_f:
+
             process = subprocess.Popen(
                 cmd,
                 cwd=str(office),
@@ -234,14 +272,72 @@ def _execute_node(node: dict, sandbox: Path, prompt_content: str) -> int:
                 bufsize=1,  # Line buffered
             )
 
-            # Stream output to both terminal and log file
             for line in process.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
-                log_f.write(line)
-                log_f.flush()
+                # Archive raw event
+                evt_f.write(line)
+                evt_f.flush()
+
+                # Parse display events
+                msg = parser.parse_line(line)
+
+                if is_complete(msg):
+                    cm: CompleteMessage = msg
+                    result_text = cm.result
+                    status.phase = "error" if cm.is_error else "complete"
+                    status.cost_usd = cm.cost_usd
+                    status.duration_ms = cm.duration_ms
+                    status.num_turns = cm.num_turns
+                    status.tool_name = ""
+                    status.agent_name = ""
+                    # Log final result
+                    log_f.write(f"\n--- result ---\n{cm.result}\n")
+                    log_f.flush()
+                    # Print status
+                    _print_status(status)
+                    write_status(status, status_path)
+
+                elif isinstance(msg, list):
+                    for m in msg:
+                        _process_stream_message(m, status, log_f)
+                    _print_status(status)
+                    write_status(status, status_path)
+
+                elif isinstance(msg, StreamMessage):
+                    _process_stream_message(msg, status, log_f)
+                    _print_status(status)
+                    write_status(status, status_path)
+
+                # Parse agent events (separate track)
+                agent_evt = parser.parse_agent_event(line)
+                if agent_evt is not None:
+                    if agent_evt.kind == "agent_spawn" and agent_evt.agent_name:
+                        status.phase = "agent"
+                        status.agent_name = agent_evt.agent_name
+                        status.agent_description = agent_evt.description
+                        log_f.write(f"[agent:spawn] {agent_evt.agent_name} ({agent_evt.agent_type})\n")
+                        log_f.flush()
+                        _print_status(status)
+                        write_status(status, status_path)
+                    elif agent_evt.kind == "agent_progress":
+                        if agent_evt.last_tool:
+                            status.tool_name = agent_evt.last_tool
+                        if agent_evt.description:
+                            status.agent_description = agent_evt.description
+                        log_f.write(f"[agent:progress] {agent_evt.agent_name or agent_evt.task_id} tool={agent_evt.last_tool}\n")
+                        log_f.flush()
+                        _print_status(status)
+                        write_status(status, status_path)
+                    elif agent_evt.kind == "agent_complete":
+                        status.phase = "running"
+                        status.agent_name = ""
+                        status.agent_description = ""
+                        log_f.write(f"[agent:complete] {agent_evt.agent_name or agent_evt.task_id} status={agent_evt.status}\n")
+                        log_f.flush()
+                        _print_status(status)
+                        write_status(status, status_path)
 
             process.wait()
+            parser.reset()
             return process.returncode
 
     except FileNotFoundError:
@@ -258,6 +354,41 @@ def _execute_node(node: dict, sandbox: Path, prompt_content: str) -> int:
         except subprocess.TimeoutExpired:
             process.kill()
         return 130
+
+
+def _process_stream_message(msg: StreamMessage, status: StatusSnapshot, log_f) -> None:
+    """Process a single StreamMessage and update status + log."""
+    if msg.content_type == "text" and msg.text:
+        status.phase = "running"
+        status.tool_name = ""
+        # Keep a short preview of the latest text
+        status.last_text_preview = msg.text.strip()[:80]
+        log_f.write(msg.text)
+        log_f.flush()
+    elif msg.content_type == "tool_use" and msg.tool_name:
+        status.phase = "tool"
+        status.tool_name = msg.tool_name
+        # Log tool invocation
+        input_preview = ""
+        if msg.tool_input:
+            input_preview = json.dumps(msg.tool_input, ensure_ascii=False)[:120]
+        log_f.write(f"[tool:{msg.tool_name}] {input_preview}\n")
+        log_f.flush()
+
+
+# Last printed status line length (for clearing)
+_last_status_len = 0
+
+
+def _print_status(status: StatusSnapshot) -> None:
+    """Print current status to stderr as a single overwriting line."""
+    global _last_status_len
+    line = format_status_line(status)
+    # Overwrite previous status line using \r
+    padded = line.ljust(_last_status_len)
+    sys.stderr.write(f"\r{padded}")
+    sys.stderr.flush()
+    _last_status_len = len(line)
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +496,9 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
     nodes = run_state["nodes"]
     total = len(nodes)
 
+    # Project-local status file (in .o-team/ directory)
+    project_status_path = sandbox.parent.parent / STATUS_FILE_NAME
+
     for i in range(run_state["current_node_index"], total):
         node = nodes[i]
         run_state["current_node_index"] = i
@@ -391,8 +525,12 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
         _save_state(run_state, sandbox)
 
         start_time = time.time()
-        exit_code = _execute_node(node, sandbox, prompt_content)
+        exit_code = _execute_node(node, sandbox, prompt_content, run_state, project_status_path)
         elapsed = time.time() - start_time
+
+        # Clear the status line after node completes
+        sys.stderr.write("\r" + " " * 120 + "\r")
+        sys.stderr.flush()
 
         node["exit_code"] = exit_code
         node["finished_at"] = utils.now_iso()
@@ -407,6 +545,7 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
             print(f"   Run ID: {run_state['run_id']}")
             print(f"   操作: python -m scripts.approve_node {run_state['run_id']} {node['id']} retry|skip|abort")
 
+            clear_status(project_status_path)
             return {
                 "success": False,
                 "run_id": run_state["run_id"],
@@ -442,6 +581,7 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
             print(f"     reject:  python -m scripts.approve_node {run_state['run_id']} {node['id']} reject")
             print(f"     abort:   python -m scripts.approve_node {run_state['run_id']} {node['id']} abort")
 
+            clear_status(project_status_path)
             return {
                 "success": True,
                 "run_id": run_state["run_id"],
@@ -456,6 +596,7 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
     run_state["finished_at"] = utils.now_iso()
     _save_state(run_state, sandbox)
 
+    clear_status(status_path)
     print(f"\n🏁 Pipeline '{run_state['pipeline_name']}' complete")
     print(f"   Run ID: {run_state['run_id']}")
     print(f"   最終產出: {sandbox / nodes[-1]['id'] / 'output.md'}")

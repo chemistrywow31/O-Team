@@ -14,7 +14,13 @@ First-time in this session? Show: **O-Team | Agent Office**
 
 ## Script Location
 
-Find the o-team skill directory: look for `SKILL.md` in `.claude/skills/o-team/`. Run all Python scripts from that directory with `cwd` set to it.
+Find the o-team skill directory (contains `SKILL.md`): `.claude/skills/o-team/`.
+
+**IMPORTANT**: Run scripts from the **project root** (not the skill directory), using `PYTHONPATH`:
+
+```
+PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
+```
 
 ## Flow
 

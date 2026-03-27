@@ -210,36 +210,29 @@ Objective: {objective}
   - User can provide a file path (will be copied as input.md)
   - User can say "none" or "skip" for empty input
 
-**Step 4: Execute**
-- Run `python -m scripts.run_pipeline <pipeline-yaml> --input "<input>" --json`
-- The script handles:
-  - Creating UUID sandbox
-  - Copying team configs into office folders
-  - Assembling prompts
-  - Spawning independent claude CLI processes
-  - Streaming output to terminal
-  - Auto-proceeding or pausing at gates
+**Step 4: Setup run**
+- Run `python -m scripts.setup_run <pipeline-yaml> --input "<input>" --json`
+- Creates sandbox, copies team configs, writes initial input — but does NOT execute
+- Save: `run_id`, `sandbox_path`, `nodes` array, `total_nodes`
 
-**Step 5: Handle gate pauses**
-- When the script exits with state PAUSED, present the output preview
-- Ask user for action:
-  - **approve** — accept and continue
-  - **reject** — discard and re-run this node
-  - **edit** — let user modify the output.md, then approve
-  - **skip** — skip this node, pass input through to next
-  - **abort** — cancel the entire pipeline
-- For approve: run `python -m scripts.approve_node <run-id> <node-id> approve --json`, then `python -m scripts.run_pipeline --resume <run-id> --json`
-- For reject: run `python -m scripts.approve_node <run-id> <node-id> reject --json`, then `python -m scripts.run_pipeline --resume <run-id> --json`
-- For edit: let user modify the file at `.o-team/runs/<run-id>/<node-id>/output.md`, then approve
-- For skip: run `python -m scripts.approve_node <run-id> <node-id> skip --json`, then resume
-- For abort: run `python -m scripts.approve_node <run-id> <node-id> abort --json`
+**Step 5: Execute nodes (orchestrator loop)**
+Claude orchestrates each node one at a time, staying alive between nodes:
 
-**Step 6: Handle errors**
-- When the script exits with state ERROR, show the error and log excerpt
-- Ask user: retry, skip, or abort
-- Same approve_node flow as above
+For each node (index 0 to total_nodes-1):
+1. **Announce**: tell user which node is starting
+2. **Execute**: run `python -m scripts.execute_node <sandbox_path> <node_index> --json` in background
+3. **Monitor**: while waiting, periodically run `python -m scripts.check_status --live --json` and report progress
+4. **Handle result**:
+   - Error → ask user: Retry / Skip / Abort
+   - Success + auto → run `python -m scripts.complete_node <sandbox_path> <node_id> --json` to transfer output, continue
+   - Success + gate → show output preview, ask user: Approve / Reject / Edit / Skip / Abort
+     - Approve → run complete_node, continue
+     - Reject → re-execute this node
+     - Edit → modify output.md, then approve
+     - Skip → run `complete_node --skip`, continue
+     - Abort → stop
 
-**Step 7: Pipeline complete**
+**Step 6: Pipeline complete**
 - Show final output location
 - Offer to read and display the final output.md
 

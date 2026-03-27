@@ -29,73 +29,116 @@ PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
 
 **Use AskUserQuestion for user interaction steps.** Do NOT use free-form text conversation.
 
-**Step 1: Locate pipeline**
+You are the **orchestrator**. You execute each node one at a time, report progress between nodes, and handle gates interactively. This keeps you alive and visible to the user throughout the pipeline.
+
+---
+
+### Step 1: Locate pipeline
+
 - Look for `.o-team/pipelines/<pipeline-name>.yaml`
 - If not found, try slugified version
 - If still not found, list `.o-team/pipelines/` and use AskUserQuestion to let user pick
 
-**Step 2: Validate pipeline**
+### Step 2: Validate pipeline
+
 - Run `PYTHONPATH=.claude/skills/o-team python -m scripts.validate_pipeline <path> --json`
 
-**Step 3: Get initial input**
+### Step 3: Get initial input
+
 - Use AskUserQuestion:
   - Question: "Provide initial input for the first node:"
 
-**Step 4: Execute (background)**
-- Run pipeline in the **background** so you can report progress:
-  ```
-  PYTHONPATH=.claude/skills/o-team python -m scripts.run_pipeline <pipeline-yaml> --input "<input>" --json
-  ```
-  Use `run_in_background: true` for the Bash tool.
-- Immediately tell user: "Pipeline started. I'll monitor progress and report updates."
+### Step 4: Setup run
 
-**Step 5: Monitor progress**
-While the pipeline runs in background, **periodically check and report status** to keep the user informed.
+Create the sandbox (no execution yet):
 
-- Read the live status file to see real-time activity:
-  ```
-  PYTHONPATH=.claude/skills/o-team python -m scripts.check_status --live --json
-  ```
-- This returns: current node, phase (running/tool/agent), active tool name, agent name, text preview
-- Report a concise status update to the user, e.g.:
-  - "Node 1/3 (research-team): Agent 'Investigator Alpha' running — WebSearch"
-  - "Node 1/3 (research-team): Tool Read — src/config.py"
-  - "Node 2/3 (design-team): Writing output..."
-- Check every **30-60 seconds** while waiting for the background task notification
-- When you receive the background task completion notification, **stop monitoring** and proceed to Step 6
+```
+PYTHONPATH=.claude/skills/o-team python -m scripts.setup_run <pipeline-yaml> --input "<input>" --json
+```
 
-**Step 6: Handle result**
-Read the pipeline result from the background task output.
+Save from the result:
+- `run_id`
+- `sandbox_path`
+- `nodes` array (each has `id`, `team`, `mode`)
+- `total_nodes`
 
-- If state is **PAUSED** (gate node): go to Step 7
-- If state is **ERROR**: go to Step 8
-- If state is **COMPLETE**: go to Step 9
+Tell user: "Pipeline **{pipeline_name}** ready — {total_nodes} nodes. Starting execution."
 
-**Step 7: Handle gate pauses**
-When state is PAUSED, show output preview then use AskUserQuestion:
-- Read the gate node's output.md from the sandbox path
-- Question: "Review node output. What would you like to do?"
-- Options:
-  - "Approve — accept and continue"
-  - "Reject — discard and re-run this node"
-  - "Edit — modify output.md then continue"
-  - "Skip — skip this node"
-  - "Abort — cancel entire pipeline"
-- Apply:
-  - Approve → `PYTHONPATH=.claude/skills/o-team python -m scripts.approve_node <run-id> <node-id> approve --json` then resume
-  - Reject → `... reject --json` then resume
-  - Edit → let user modify output.md, then approve
-  - Skip → `... skip --json` then resume
-  - Abort → `... abort --json`
-- After approve/reject/skip, resume pipeline:
-  ```
-  PYTHONPATH=.claude/skills/o-team python -m scripts.run_pipeline --resume <run-id> --json
-  ```
-  Run this in background again and return to Step 5 (monitor progress).
+### Step 5: Execute nodes (LOOP)
 
-**Step 8: Handle errors**
-When state is ERROR, show error then use AskUserQuestion:
-- Options: "Retry" / "Skip" / "Abort"
+For each node in the `nodes` array, from index 0 to total_nodes-1:
 
-**Step 9: Pipeline complete**
-Show final output location, offer to display output.md
+#### 5a. Announce
+
+Tell user:
+```
+▶ Node {index+1}/{total}: {node_id} ({team}) [{mode}]
+```
+
+#### 5b. Execute node (background)
+
+Run in background (`run_in_background: true`):
+
+```
+PYTHONPATH=.claude/skills/o-team python -m scripts.execute_node <sandbox_path> <node_index> --json
+```
+
+#### 5c. Monitor progress
+
+While waiting for the background task to complete, **periodically check and report status**:
+
+```
+PYTHONPATH=.claude/skills/o-team python -m scripts.check_status --live --json
+```
+
+- Report a concise status update to the user based on the `phase`, `tool`, `agent`, `preview` fields
+- Examples:
+  - "🔧 Tool: WebSearch"
+  - "🤖 Agent: Investigator Alpha — researching market data"
+  - "✍️ Writing output..."
+- Check every **30-60 seconds**
+- When you receive the background task completion notification, **stop monitoring** and proceed to 5d
+
+#### 5d. Handle result
+
+Read the result from the background task output (JSON).
+
+**If error** (`success: false`):
+- Show: "❌ Node '{node_id}' failed (exit {exit_code})"
+- Use AskUserQuestion:
+  - Options: "Retry" / "Skip" / "Abort"
+  - Retry → go back to 5b for this node
+  - Skip → run `python -m scripts.complete_node <sandbox_path> <node_id> --skip --json`, continue to next node
+  - Abort → stop pipeline
+
+**If success + auto mode**:
+- Run `PYTHONPATH=.claude/skills/o-team python -m scripts.complete_node <sandbox_path> <node_id> --json`
+- Show: "✅ Node '{node_id}' complete ({duration}s, ${cost}). → Moving to {next_node_id}"
+- Continue to next node
+
+**If success + gate mode**:
+- Read the node's output.md: `<sandbox_path>/<node_id>/output.md`
+- Show a preview of the output (first 30 lines)
+- Use AskUserQuestion:
+  - Question: "Review the output. What would you like to do?"
+  - Options:
+    - "Approve — accept and continue"
+    - "Reject — discard and re-run this node"
+    - "Edit — modify output before continuing"
+    - "Skip — skip this node"
+    - "Abort — cancel pipeline"
+  - Approve → run `python -m scripts.complete_node <sandbox_path> <node_id> --json`, continue
+  - Reject → go back to 5b (re-execute this node)
+  - Edit → let user describe changes, apply edits to output.md, then treat as Approve
+  - Skip → run `python -m scripts.complete_node <sandbox_path> <node_id> --skip --json`, continue
+  - Abort → stop pipeline
+
+### Step 6: Pipeline complete
+
+When all nodes are done:
+- Show: "🏁 Pipeline '{pipeline_name}' complete"
+- Show final output path from the last complete_node result
+- Use AskUserQuestion:
+  - Question: "What would you like to do?"
+  - Options: "Show full output" / "Done"
+  - If "Show full output": Read and display the final output.md

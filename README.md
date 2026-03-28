@@ -101,14 +101,14 @@ All commands also work with the `o-team:` prefix:
 
 3. **Execution** creates an isolated sandbox for each run. Each node gets its own office folder with the team's config, runs as an independent `claude -p` process, and writes `output.md` which becomes the next node's input.
 
-### Design Highlights
+### Why O-Team
 
-- **Independent context per node** — Each pipeline node spawns a separate `claude` process with a fresh context window. No context degradation across steps, no cross-contamination between teams.
-- **Type-safe stream parsing** — The stream parser uses Python dataclasses (`StreamMessage`, `CompleteMessage`, `StatusSnapshot`) for structured event handling. Agent lifecycle tracking links `tool_use_id` to `task_id` for accurate subagent monitoring.
-- **Three-layer audit trail** — Every node produces `prompt.md` (assembled prompt), `events.jsonl` (raw stream events), and `run.log` (human-readable log). Full reproducibility and debugging.
-- **Human checkpoints** — Gate nodes pause for review with approve/reject/edit/skip options. Automatic nodes proceed without intervention. Mix both in a single pipeline.
-- **Resumable execution** — `--from N` restarts from any node, automatically cloning prior outputs from the latest run. Bring custom input or use previous results as-is.
-- **Real-time statusline** — Live pipeline status in the Claude Code status bar, with merge support for claude-hud. Tracks current node, active tool, spawned agents, cost, and duration.
+- **Fresh context every step** — Each node runs in its own `claude` process. No context degradation, no cross-contamination between teams. Step 5 is as sharp as step 1.
+- **Review where it matters** — Gate nodes pause for your review with approve, reject, edit, or skip. Auto nodes run hands-free. Mix both in one pipeline.
+- **Pick up where you left off** — `--from N` restarts from any node, reusing outputs from the previous run. Swap in revised input or keep everything as-is.
+- **Full audit trail** — Every node saves its assembled prompt, raw stream events, and human-readable log. See exactly what happened and why.
+- **Live status bar** — Real-time pipeline progress in your Claude Code status bar. See which node is running, what tool it's using, and how much it costs — as it happens.
+- **Stream-parsed monitoring** — Type-safe event parsing tracks tool calls, agent spawns, costs, and durations. Agent lifecycle linking (`tool_use_id` → `task_id`) gives you accurate subagent visibility.
 
 ### Installation
 
@@ -276,14 +276,14 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 
 3. **執行**時為每次 run 建立隔離的 sandbox。每個節點有自己的辦公室資料夾、獨立的 `claude -p` 程序，產出的 `output.md` 成為下一個節點的輸入。
 
-### 設計亮點
+### 為什麼選 O-Team
 
-- **節點獨立上下文** — 每個 pipeline 節點啟動獨立的 `claude` 程序，全新的 context window。步驟之間不會有上下文退化，團隊之間不會交叉汙染。
-- **型別安全的串流解析** — Stream parser 使用 Python dataclass（`StreamMessage`、`CompleteMessage`、`StatusSnapshot`）進行結構化事件處理。Agent 生命週期追蹤透過 `tool_use_id` → `task_id` 連結，精確監控 subagent。
-- **三層稽核軌跡** — 每個節點產出 `prompt.md`（組裝後的 prompt）、`events.jsonl`（原始串流事件）、`run.log`（人類可讀日誌）。完整的可重現性與除錯能力。
-- **人工檢查點** — Gate 節點暫停等待審核，提供核准/退回/編輯/跳過選項。Auto 節點自動推進。同一 pipeline 可混合使用。
-- **可恢復執行** — `--from N` 從任意節點重新開始，自動從最近的 run 複製先前的產出。可帶入自訂 input 或直接使用先前結果。
-- **即時狀態列** — Claude Code 狀態列即時顯示 pipeline 進度，支援與 claude-hud 合併。追蹤當前節點、使用中的工具、啟動的 agent、成本與耗時。
+- **每一步都是全新上下文** — 每個節點在自己的 `claude` 程序中執行。沒有上下文退化，團隊之間不會交叉汙染。第 5 步和第 1 步一樣精準。
+- **在關鍵環節把關** — Gate 節點暫停讓你審核，支援核准、退回、編輯、跳過。Auto 節點全自動推進。同一 pipeline 自由混搭。
+- **從任意節點接續** — `--from N` 從指定節點重新開始，自動沿用上次 run 的產出。可以帶入修改過的 input，也可以直接用先前結果。
+- **完整稽核軌跡** — 每個節點保存組裝後的 prompt、原始串流事件、人類可讀日誌。出了什麼事、為什麼，一目了然。
+- **即時狀態列** — Claude Code 狀態列即時顯示 pipeline 進度。當前節點在幹嘛、用了什麼工具、花了多少錢 — 執行中就能看到。
+- **串流解析監控** — 型別安全的事件解析，追蹤 tool calls、agent 啟動、成本與耗時。Agent 生命週期連結（`tool_use_id` → `task_id`）提供精確的 subagent 可見性。
 
 ### 安裝
 

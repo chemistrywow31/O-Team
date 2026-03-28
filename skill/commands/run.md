@@ -35,24 +35,40 @@ You are the **orchestrator**. You execute each node one at a time, report progre
 - AskUserQuestion: show numbered list, pre-selected as default. "Which pipeline to run?"
 - Validate: `python -m scripts.validate_pipeline <path> --json`
 
-### Step 2: Get initial input
+### Step 2: Check for previous runs & get input
 
-- AskUserQuestion: "Provide initial input for the first node:"
+- Check for previous runs: `python -m scripts.list_runs --json`
+- If previous runs exist for this pipeline, AskUserQuestion:
+  - "Start fresh from the beginning"
+  - "Resume from node N (uses previous results for earlier nodes)"
+  - Show completed nodes from the latest run for context
+- If "Resume from node N": ask which node number, save as `from_node`
+- AskUserQuestion: "Provide input for the {first/starting} node:"
+  - If resuming from node N and user says "use previous" or similar, skip input (script defaults to previous node's output)
 
 ### Step 3: Setup run
 
 **IMPORTANT**: Write user input to temp file to avoid shell length limits.
 
 ```bash
-# Write input to temp file, then:
+# Fresh run:
 PYTHONPATH=.claude/skills/ot python -m scripts.setup_run <pipeline.yaml> --input-file .o-team/tmp-input.md --json
+
+# Resume from node N (uses previous run's outputs for nodes before N):
+PYTHONPATH=.claude/skills/ot python -m scripts.setup_run <pipeline.yaml> --from <N> --json
+
+# Resume from node N with custom input:
+PYTHONPATH=.claude/skills/ot python -m scripts.setup_run <pipeline.yaml> --from <N> --input-file .o-team/tmp-input.md --json
+
+# Resume from specific run:
+PYTHONPATH=.claude/skills/ot python -m scripts.setup_run <pipeline.yaml> --from <N> --clone <run-id> --json
 ```
 
-Save: `run_id`, `sandbox_path`, `nodes`, `total_nodes`
+Save: `run_id`, `sandbox_path`, `nodes`, `total_nodes`, `start_from_index`
 
 ### Step 4: Execute nodes (LOOP)
 
-For each node (index 0 to total_nodes-1):
+For each node (index `start_from_index` to total_nodes-1, skipping COMPLETE nodes):
 
 #### 4a. Announce
 Tell user: `Node {i+1}/{total}: {node_id} ({team}) [{mode}]`

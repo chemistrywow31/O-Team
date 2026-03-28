@@ -107,4 +107,16 @@ Report: tool name, agent name, activity preview.
 
 ### Step 5: Complete
 
-Show final output path. AskUserQuestion: "Show full output" / "Done"
+Show final output path.
+
+#### 5a. Archive prompt
+AskUserQuestion: "Name this run for archiving? (leave empty to skip)"
+- If user provides a name:
+  ```bash
+  PYTHONPATH=.claude/skills/ot python -m scripts.archive_run <sandbox_path> --name "<user-input>" --json
+  ```
+  Show the new archived path from the result.
+- If user skips (empty): continue without archiving.
+
+#### 5b. Final
+AskUserQuestion: "Show full output" / "Done"

@@ -67,8 +67,9 @@ PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
 - Prompt guidelines:
   - Do NOT reference input.md or output.md — the system automatically injects input context into the prompt and appends output instructions
   - For Node 1: reference the input contextually (e.g., "根據提供的研究主題" / "Based on the provided topic") since user's initial input is injected as "## Initial Input"
-  - For subsequent nodes: reference the previous step's output contextually (e.g., "根據前一階段的調查報告" / "Based on the research report from the previous step") since it is injected as "## Context (from previous step)"
+  - For subsequent nodes: reference the previous step contextually (e.g., "根據前一階段的調查報告" / "Based on the research report from the previous step") since it is injected as "## Context (from previous step)"
   - Focus prompts on WHAT to do and HOW to structure the deliverable
+  - **Output format placement**: Users only care about the final deliverable. If the user specifies an output format (e.g., "HTML report", "PDF", "markdown spec"), apply that format requirement to the **LAST node only**. Intermediate nodes should produce structured markdown for downstream consumption, not the user's requested format
 
 **Step 7: Review prompts**
 - Present complete pipeline with all prompts:

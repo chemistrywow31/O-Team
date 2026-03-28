@@ -136,12 +136,23 @@ def main():
     parser.add_argument("pipeline", help="Path to pipeline YAML")
     parser.add_argument("--input", default=None,
                         help="Initial input (text or file path)")
+    parser.add_argument("--input-file", default=None,
+                        help="Read initial input from this file")
     parser.add_argument("--project-dir", default=None)
     parser.add_argument("--json", action="store_true", default=False)
     args = parser.parse_args()
 
     proj_dir = Path(args.project_dir) if args.project_dir else None
-    result = setup_run(args.pipeline, args.input, proj_dir)
+
+    input_content = args.input
+    if args.input_file:
+        input_path = Path(args.input_file)
+        if not input_path.exists():
+            utils.print_json({"success": False, "error": f"Input file not found: {args.input_file}"})
+            sys.exit(1)
+        input_content = input_path.read_text(encoding="utf-8")
+
+    result = setup_run(args.pipeline, input_content, proj_dir)
 
     if args.json:
         utils.print_json(result)

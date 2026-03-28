@@ -164,6 +164,28 @@ def _assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
         parts.append(f"Workspace path: {workspace}")
         parts.append("")
 
+    # Team rules (from .claude/rules/*.md)
+    rules_dir = office / ".claude" / "rules"
+    if rules_dir.is_dir():
+        rule_files = sorted(rules_dir.glob("*.md"))
+        if rule_files:
+            parts.append("## Team Rules")
+            parts.append("")
+            for rf in rule_files:
+                try:
+                    content = rf.read_text(encoding="utf-8").strip()
+                    if content.startswith("---"):
+                        end = content.find("---", 3)
+                        if end != -1:
+                            content = content[end + 3:].strip()
+                    if content:
+                        parts.append(f"### {rf.stem}")
+                        parts.append("")
+                        parts.append(content)
+                        parts.append("")
+                except Exception:
+                    pass
+
     # Node-specific instructions
     prompt_text = node.get("prompt", "")
     if prompt_text and prompt_text.strip():

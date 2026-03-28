@@ -1,25 +1,14 @@
 ---
 name: o-team:status
-description: Check run status and per-node progress
+description: "[Alias → /ot:status] Check run status"
 argument-hint: "<run-id>"
 allowed-tools:
   - Read
   - Bash
 ---
 
-# O-Team Status
+This command has a shorter alias: `/ot:status`
 
-## Script Location
+Follow the exact same flow as `/ot:status`.
 
-Find the o-team skill directory (contains `SKILL.md`): `.claude/skills/o-team/`.
-
-**IMPORTANT**: Run scripts from the **project root** (not the skill directory), using `PYTHONPATH`:
-
-```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
-```
-
-## Flow
-
-1. Run `python -m scripts.check_status <run-id> --json`
-2. Present node states with icons
+Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`

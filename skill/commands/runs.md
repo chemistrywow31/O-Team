@@ -1,24 +1,13 @@
 ---
 name: o-team:runs
-description: List run history with state, progress, and timestamps
+description: "[Alias → /ot:runs] List run history"
 allowed-tools:
   - Read
   - Bash
 ---
 
-# O-Team Runs
+This command has a shorter alias: `/ot:runs`
 
-## Script Location
+Follow the exact same flow as `/ot:runs`.
 
-Find the o-team skill directory (contains `SKILL.md`): `.claude/skills/o-team/`.
-
-**IMPORTANT**: Run scripts from the **project root** (not the skill directory), using `PYTHONPATH`:
-
-```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
-```
-
-## Flow
-
-1. Run `python -m scripts.list_runs --json`
-2. Present as table with run ID, pipeline name, state, progress, timestamps
+Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`

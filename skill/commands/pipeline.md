@@ -1,6 +1,6 @@
 ---
 name: o-team:pipeline
-description: Manage pipelines — list, show, or remove
+description: "[Alias → /ot:pipe] Manage pipelines"
 argument-hint: "list | show <name> | remove <name>"
 allowed-tools:
   - Read
@@ -9,35 +9,13 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# O-Team Pipeline Management
+This command has a shorter alias: `/ot:pipe`
 
-## Script Location
+Follow the exact same flow as `/ot:pipe`. Parse argument as:
+- `list` or no argument → same as `/ot:pipe` (list)
+- `show <name>` → same as `/ot:pipe show <name>`
+- `remove <name>` → same as `/ot:pipe rm <name>`
 
-Find the o-team skill directory (contains `SKILL.md`): `.claude/skills/o-team/`.
+Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`
 
-**IMPORTANT**: Run scripts from the **project root** (not the skill directory), using `PYTHONPATH`:
-
-```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
-```
-
-## Actions
-
-Parse the argument to determine the action. Default to `list` if no argument given.
-
-### list (default)
-
-1. List all `.o-team/pipelines/*.yaml` files
-2. For each, read the YAML and show: name, node count, team sequence
-3. Present as numbered list
-
-### show <name>
-
-1. Read `.o-team/pipelines/<name>.yaml`
-2. Display full pipeline details: name, objective, each node (team, mode, prompt preview)
-
-### remove <name>
-
-1. Check `.o-team/pipelines/<name>.yaml` exists
-2. Delete the file
-3. Confirm removal
+See `/ot:pipe` for full documentation.

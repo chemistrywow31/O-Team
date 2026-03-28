@@ -7,7 +7,7 @@ description: Orchestrate multi-team AI agent pipelines via CLI. Use when user wa
 
 ## Banner
 
-**The first time any `/o-team:*` command is triggered in a session**, display this before proceeding:
+**The first time any `/ot:*` or `/o-team:*` command is triggered in a session**, display this before proceeding:
 
 **O-Team | Agent Office**
 
@@ -18,7 +18,7 @@ Only show this banner **once per session** (not on every command). After the ban
 O-Team supports English (en) and Traditional Chinese (zh-TW).
 
 **Language detection** (run `python -m scripts.config detect --json` to check):
-1. `~/.o-team/config.json` → `"language"` field (user override via `/o-team:config`)
+1. `~/.o-team/config.json` → `"language"` field (user override via `/ot:config`)
 2. `~/.claude/settings.json` → `"language"` field
 3. System `LANG` / `LC_ALL` environment variable
 4. Fallback: English
@@ -33,18 +33,17 @@ Enable users to register A-Team generated agent teams, build named execution pip
 
 ## Commands
 
-| Command | Trigger |
-|---------|---------|
-| `/o-team:registry add <path>` | Register team folder(s) |
-| `/o-team:registry list` | List registered teams |
-| `/o-team:registry remove <slug>` | Remove a registered team |
-| `/o-team:build` | Build a named pipeline interactively |
-| `/o-team:run <pipeline-name>` | Execute a pipeline |
-| `/o-team:status <run-id>` | Check run status |
-| `/o-team:runs` | List run history |
-| `/o-team:clean [run-id]` | Clean up run directories |
-| `/o-team:pipeline list\|show\|remove` | Manage saved pipelines |
-| `/o-team:config` | Configure O-Team settings (statusline, etc.) |
+| Short | Long (alias) | Description |
+|-------|-------------|-------------|
+| `/ot:demo` | — | Guided tutorial — experience a full pipeline |
+| `/ot:reg [add\|rm]` | `/o-team:registry` | Manage team registry |
+| `/ot:build` | `/o-team:build` | Build a pipeline interactively |
+| `/ot:run [name]` | `/o-team:run` | Execute a pipeline |
+| `/ot:pipe [show\|rm]` | `/o-team:pipeline` | Manage saved pipelines |
+| `/ot:status` | `/o-team:status` | Check run status |
+| `/ot:runs` | `/o-team:runs` | List run history |
+| `/ot:clean` | `/o-team:clean` | Clean up run directories |
+| `/ot:config` | `/ot:config` | Settings (statusline, language) |
 
 ## Script Location
 

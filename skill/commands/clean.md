@@ -1,6 +1,6 @@
 ---
 name: o-team:clean
-description: Clean up run directories
+description: "[Alias → /ot:clean] Clean up run directories"
 argument-hint: "[run-id | --all | --state COMPLETE]"
 allowed-tools:
   - Read
@@ -8,21 +8,8 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# O-Team Clean
+This command has a shorter alias: `/ot:clean`
 
-## Script Location
+Follow the exact same flow as `/ot:clean`.
 
-Find the o-team skill directory (contains `SKILL.md`): `.claude/skills/o-team/`.
-
-**IMPORTANT**: Run scripts from the **project root** (not the skill directory), using `PYTHONPATH`:
-
-```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
-```
-
-## Flow
-
-- Without argument: `python -m scripts.clean_runs --json` → show summary, ask what to clean
-- With run-id: `python -m scripts.clean_runs <run-id> --json`
-- With "all": `python -m scripts.clean_runs --all --json`
-- With state: `python -m scripts.clean_runs --state COMPLETE --json`
+Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`

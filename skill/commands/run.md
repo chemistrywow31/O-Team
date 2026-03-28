@@ -75,13 +75,14 @@ Report: tool name, agent name, activity preview.
 - Report result, continue to next node
 
 **Success + gate**:
-- Read `<sandbox_path>/<node_id>/output.md`, show preview (30 lines)
-- AskUserQuestion: Approve / Reject / Edit / Skip / Abort
-  - Approve → complete_node, continue
-  - Reject → re-execute (4b)
-  - Edit → modify output.md, then approve
-  - Skip → `complete_node --skip`, continue
-  - Abort → stop
+- Read `<sandbox_path>/<node_id>/output.md`, show preview (first 30 lines)
+- AskUserQuestion: "Review the output:"
+  - **View full output** — Read and display the ENTIRE output.md, then show this menu again
+  - **Approve** — `complete_node`, continue
+  - **Reject** — re-execute (4b)
+  - **Edit** — first display the full output.md content, then AskUserQuestion "What changes would you like to make?", apply edits to output.md, show the updated content, then AskUserQuestion: Approve / Edit again
+  - **Skip** — `complete_node --skip`, continue
+  - **Abort** — stop
 
 ### Step 5: Complete
 

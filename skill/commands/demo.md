@@ -148,9 +148,10 @@ In a real workflow, you'd use this for quality control — reviewing
 deliverables before they move forward or become the final output.
 
 Your options:
+  View full output — read the complete deliverable first
   Approve — accept the result
   Reject  — discard and re-run this node
-  Edit    — modify the output before accepting
+  Edit    — view the full content, then tell me what to change
 ```
 
 Then use AskUserQuestion with the standard gate options.

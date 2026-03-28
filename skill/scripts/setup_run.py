@@ -93,7 +93,7 @@ def setup_run(
         office.mkdir(exist_ok=True)
 
         team_path = Path(node["team_path"])
-        _copy_team_config(team_path, office)
+        utils.copy_team_config(team_path, office)
 
         # Mark earlier nodes as COMPLETE when using --from
         if from_node is not None and i < start_index:
@@ -241,20 +241,6 @@ def _find_source_run(
             best = entry
 
     return best
-
-
-def _copy_team_config(team_path: Path, office: Path) -> None:
-    """Copy CLAUDE.md and .claude/ directory into the office folder."""
-    src_claude_md = team_path / "CLAUDE.md"
-    if src_claude_md.exists():
-        shutil.copy2(src_claude_md, office / "CLAUDE.md")
-
-    src_claude_dir = team_path / ".claude"
-    dst_claude_dir = office / ".claude"
-    if src_claude_dir.is_dir():
-        if dst_claude_dir.exists():
-            shutil.rmtree(dst_claude_dir)
-        shutil.copytree(src_claude_dir, dst_claude_dir)
 
 
 # ---------------------------------------------------------------------------

@@ -101,6 +101,15 @@ All commands also work with the `o-team:` prefix:
 
 3. **Execution** creates an isolated sandbox for each run. Each node gets its own office folder with the team's config, runs as an independent `claude -p` process, and writes `output.md` which becomes the next node's input.
 
+### Design Highlights
+
+- **Independent context per node** — Each pipeline node spawns a separate `claude` process with a fresh context window. No context degradation across steps, no cross-contamination between teams.
+- **Type-safe stream parsing** — The stream parser uses Python dataclasses (`StreamMessage`, `CompleteMessage`, `StatusSnapshot`) for structured event handling. Agent lifecycle tracking links `tool_use_id` to `task_id` for accurate subagent monitoring.
+- **Three-layer audit trail** — Every node produces `prompt.md` (assembled prompt), `events.jsonl` (raw stream events), and `run.log` (human-readable log). Full reproducibility and debugging.
+- **Human checkpoints** — Gate nodes pause for review with approve/reject/edit/skip options. Automatic nodes proceed without intervention. Mix both in a single pipeline.
+- **Resumable execution** — `--from N` restarts from any node, automatically cloning prior outputs from the latest run. Bring custom input or use previous results as-is.
+- **Real-time statusline** — Live pipeline status in the Claude Code status bar, with merge support for claude-hud. Tracks current node, active tool, spawned agents, cost, and duration.
+
 ### Installation
 
 ```bash
@@ -266,6 +275,15 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 2. **Pipeline** 把註冊的團隊依序串接。每個團隊成為一個節點，可設為 `auto`（自動繼續）或 `gate`（暫停審核）。
 
 3. **執行**時為每次 run 建立隔離的 sandbox。每個節點有自己的辦公室資料夾、獨立的 `claude -p` 程序，產出的 `output.md` 成為下一個節點的輸入。
+
+### 設計亮點
+
+- **節點獨立上下文** — 每個 pipeline 節點啟動獨立的 `claude` 程序，全新的 context window。步驟之間不會有上下文退化，團隊之間不會交叉汙染。
+- **型別安全的串流解析** — Stream parser 使用 Python dataclass（`StreamMessage`、`CompleteMessage`、`StatusSnapshot`）進行結構化事件處理。Agent 生命週期追蹤透過 `tool_use_id` → `task_id` 連結，精確監控 subagent。
+- **三層稽核軌跡** — 每個節點產出 `prompt.md`（組裝後的 prompt）、`events.jsonl`（原始串流事件）、`run.log`（人類可讀日誌）。完整的可重現性與除錯能力。
+- **人工檢查點** — Gate 節點暫停等待審核，提供核准/退回/編輯/跳過選項。Auto 節點自動推進。同一 pipeline 可混合使用。
+- **可恢復執行** — `--from N` 從任意節點重新開始，自動從最近的 run 複製先前的產出。可帶入自訂 input 或直接使用先前結果。
+- **即時狀態列** — Claude Code 狀態列即時顯示 pipeline 進度，支援與 claude-hud 合併。追蹤當前節點、使用中的工具、啟動的 agent、成本與耗時。
 
 ### 安裝
 

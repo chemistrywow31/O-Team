@@ -15,7 +15,6 @@ Each node runs in its own context with its own team identity.
 """
 
 import argparse
-import json
 import shutil
 import subprocess
 import sys
@@ -23,6 +22,7 @@ import time
 from pathlib import Path
 
 from . import utils
+from .prompt import assemble_prompt
 from .stream_parser import (
     StreamParser,
     StatusSnapshot,
@@ -30,6 +30,7 @@ from .stream_parser import (
     StreamMessage,
     format_status_line,
     is_complete,
+    process_stream_message,
     write_status,
     clear_status,
     STATUS_FILE_NAME,
@@ -63,7 +64,7 @@ def _create_sandbox(pipeline: dict, project_dir: Path) -> dict:
 
         # Copy team configuration into office folder
         team_path = Path(node["team_path"])
-        _copy_team_config(team_path, office)
+        utils.copy_team_config(team_path, office)
 
         nodes_state.append({
             "id": node["id"],
@@ -98,136 +99,6 @@ def _create_sandbox(pipeline: dict, project_dir: Path) -> dict:
 
     utils.write_json(sandbox / "meta.json", run_state)
     return run_state
-
-
-def _copy_team_config(team_path: Path, office: Path) -> None:
-    """Copy CLAUDE.md and .claude/ directory into the office folder."""
-    # Copy CLAUDE.md
-    src_claude_md = team_path / "CLAUDE.md"
-    if src_claude_md.exists():
-        shutil.copy2(src_claude_md, office / "CLAUDE.md")
-
-    # Copy .claude/ directory
-    src_claude_dir = team_path / ".claude"
-    dst_claude_dir = office / ".claude"
-    if src_claude_dir.is_dir():
-        if dst_claude_dir.exists():
-            shutil.rmtree(dst_claude_dir)
-        shutil.copytree(src_claude_dir, dst_claude_dir)
-
-
-# ---------------------------------------------------------------------------
-# Prompt assembly
-# ---------------------------------------------------------------------------
-
-
-def _assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
-    """Assemble the complete prompt for a node.
-
-    Combines:
-    1. Context from input.md (if exists)
-    2. Workspace file listing
-    3. Node-specific instructions (from pipeline prompt field)
-    4. Output instruction
-    """
-    office = sandbox / node["id"]
-    workspace = sandbox / "workspace"
-    parts = []
-
-    # Header
-    parts.append(f"# O-Team Pipeline Task")
-    parts.append(f"# Node: {node['id']} | Team: {node['team']}")
-    parts.append("")
-
-    # Context from input.md
-    input_file = office / "input.md"
-    if input_file.exists():
-        input_content = utils.read_text(input_file)
-        if input_content.strip():
-            if is_first_node:
-                parts.append("## Initial Input")
-            else:
-                parts.append("## Context (from previous step)")
-            parts.append("")
-            parts.append(input_content)
-            parts.append("")
-
-    # Workspace listing
-    workspace_files = _list_workspace_files(workspace)
-    if workspace_files:
-        parts.append("## Workspace Files")
-        parts.append("The workspace/ directory contains these shared files:")
-        parts.append("")
-        for wf in workspace_files:
-            parts.append(f"- {wf}")
-        parts.append("")
-        parts.append(f"Workspace path: {workspace}")
-        parts.append("")
-
-    # Team rules (from .claude/rules/*.md)
-    rules_dir = office / ".claude" / "rules"
-    if rules_dir.is_dir():
-        rule_files = sorted(rules_dir.glob("*.md"))
-        if rule_files:
-            parts.append("## Team Rules")
-            parts.append("")
-            for rf in rule_files:
-                try:
-                    content = rf.read_text(encoding="utf-8").strip()
-                    if content.startswith("---"):
-                        end = content.find("---", 3)
-                        if end != -1:
-                            content = content[end + 3:].strip()
-                    if content:
-                        parts.append(f"### {rf.stem}")
-                        parts.append("")
-                        parts.append(content)
-                        parts.append("")
-                except Exception:
-                    pass
-
-    # Node-specific instructions
-    prompt_text = node.get("prompt", "")
-    if prompt_text and prompt_text.strip():
-        parts.append("## Instructions")
-        parts.append("")
-        parts.append(prompt_text.strip())
-        parts.append("")
-
-    # Output instruction
-    parts.append("## Output")
-    parts.append("")
-    parts.append("Write your primary deliverable to output.md in the current directory.")
-    parts.append("Place any supporting files (code, data, diagrams) in the workspace/ directory.")
-    parts.append("")
-
-    return "\n".join(parts)
-
-
-def _list_workspace_files(workspace: Path) -> list[str]:
-    """List files in workspace directory (non-recursive, top level only)."""
-    if not workspace.is_dir():
-        return []
-    files = []
-    for item in sorted(workspace.iterdir()):
-        if item.name.startswith("."):
-            continue
-        if item.is_file():
-            size = item.stat().st_size
-            files.append(f"{item.name} ({_human_size(size)})")
-        elif item.is_dir():
-            count = sum(1 for _ in item.rglob("*") if _.is_file())
-            files.append(f"{item.name}/ ({count} files)")
-    return files
-
-
-def _human_size(size_bytes: int) -> str:
-    """Convert bytes to human-readable size."""
-    for unit in ("B", "KB", "MB", "GB"):
-        if size_bytes < 1024:
-            return f"{size_bytes:.0f}{unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.0f}TB"
 
 
 # ---------------------------------------------------------------------------
@@ -320,12 +191,12 @@ def _execute_node(
 
                 elif isinstance(msg, list):
                     for m in msg:
-                        _process_stream_message(m, status, log_f)
+                        process_stream_message(m, status, log_f)
                     _print_status(status)
                     write_status(status, status_path)
 
                 elif isinstance(msg, StreamMessage):
-                    _process_stream_message(msg, status, log_f)
+                    process_stream_message(msg, status, log_f)
                     _print_status(status)
                     write_status(status, status_path)
 
@@ -376,26 +247,6 @@ def _execute_node(
         except subprocess.TimeoutExpired:
             process.kill()
         return 130
-
-
-def _process_stream_message(msg: StreamMessage, status: StatusSnapshot, log_f) -> None:
-    """Process a single StreamMessage and update status + log."""
-    if msg.content_type == "text" and msg.text:
-        status.phase = "running"
-        status.tool_name = ""
-        # Keep a short preview of the latest text
-        status.last_text_preview = msg.text.strip()[:80]
-        log_f.write(msg.text)
-        log_f.flush()
-    elif msg.content_type == "tool_use" and msg.tool_name:
-        status.phase = "tool"
-        status.tool_name = msg.tool_name
-        # Log tool invocation
-        input_preview = ""
-        if msg.tool_input:
-            input_preview = json.dumps(msg.tool_input, ensure_ascii=False)[:120]
-        log_f.write(f"[tool:{msg.tool_name}] {input_preview}\n")
-        log_f.flush()
 
 
 # Last printed status line length (for clearing)
@@ -539,7 +390,7 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
 
         # Assemble prompt
         is_first = (i == 0)
-        prompt_content = _assemble_prompt(node, sandbox, is_first)
+        prompt_content = assemble_prompt(node, sandbox, is_first)
 
         # Execute
         node["state"] = "RUNNING"
@@ -618,7 +469,7 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
     run_state["finished_at"] = utils.now_iso()
     _save_state(run_state, sandbox)
 
-    clear_status(status_path)
+    clear_status(project_status_path)
     print(f"\n🏁 Pipeline '{run_state['pipeline_name']}' complete")
     print(f"   Run ID: {run_state['run_id']}")
     print(f"   最終產出: {sandbox / nodes[-1]['id'] / 'output.md'}")

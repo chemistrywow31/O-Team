@@ -8,13 +8,13 @@ updates status.json for live monitoring. Returns result when done.
 """
 
 import argparse
-import json
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 from . import utils
+from .prompt import assemble_prompt
 from .stream_parser import (
     StreamParser,
     StatusSnapshot,
@@ -22,107 +22,11 @@ from .stream_parser import (
     StreamMessage,
     format_status_line,
     is_complete,
+    process_stream_message,
     write_status,
     clear_status,
     STATUS_FILE_NAME,
 )
-
-
-# ---------------------------------------------------------------------------
-# Prompt assembly (self-contained, no dependency on run_pipeline.py)
-# ---------------------------------------------------------------------------
-
-
-def _assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
-    """Assemble the complete prompt for a node."""
-    office = sandbox / node["id"]
-    workspace = sandbox / "workspace"
-    parts: list[str] = []
-
-    # Header
-    parts.append(f"# O-Team Pipeline Task")
-    parts.append(f"# Node: {node['id']} | Team: {node['team']}")
-    parts.append("")
-
-    # Context from input.md
-    input_file = office / "input.md"
-    if input_file.exists():
-        input_content = utils.read_text(input_file)
-        if input_content.strip():
-            label = "## Initial Input" if is_first_node else "## Context (from previous step)"
-            parts.append(label)
-            parts.append("")
-            parts.append(input_content)
-            parts.append("")
-
-    # Workspace listing
-    if workspace.is_dir():
-        files = []
-        for item in sorted(workspace.iterdir()):
-            if item.name.startswith("."):
-                continue
-            if item.is_file():
-                size = item.stat().st_size
-                unit = "B"
-                for u in ("KB", "MB", "GB"):
-                    if size >= 1024:
-                        size /= 1024
-                        unit = u
-                files.append(f"{item.name} ({size:.0f}{unit})")
-            elif item.is_dir():
-                count = sum(1 for _ in item.rglob("*") if _.is_file())
-                files.append(f"{item.name}/ ({count} files)")
-        if files:
-            parts.append("## Workspace Files")
-            parts.append("The workspace/ directory contains these shared files:")
-            parts.append("")
-            for f in files:
-                parts.append(f"- {f}")
-            parts.append("")
-            parts.append(f"Workspace path: {workspace}")
-            parts.append("")
-
-    # Team rules (from .claude/rules/*.md)
-    # Injected explicitly because claude -p may not auto-discover rules
-    # from a non-git-root office directory.
-    rules_dir = office / ".claude" / "rules"
-    if rules_dir.is_dir():
-        rule_files = sorted(rules_dir.glob("*.md"))
-        if rule_files:
-            parts.append("## Team Rules")
-            parts.append("")
-            for rf in rule_files:
-                try:
-                    content = rf.read_text(encoding="utf-8").strip()
-                    # Strip frontmatter if present
-                    if content.startswith("---"):
-                        end = content.find("---", 3)
-                        if end != -1:
-                            content = content[end + 3:].strip()
-                    if content:
-                        parts.append(f"### {rf.stem}")
-                        parts.append("")
-                        parts.append(content)
-                        parts.append("")
-                except Exception:
-                    pass
-
-    # Node-specific instructions
-    prompt_text = node.get("prompt", "")
-    if prompt_text and prompt_text.strip():
-        parts.append("## Instructions")
-        parts.append("")
-        parts.append(prompt_text.strip())
-        parts.append("")
-
-    # Output instruction
-    parts.append("## Output")
-    parts.append("")
-    parts.append("Write your primary deliverable to output.md in the current directory.")
-    parts.append("Place any supporting files (code, data, diagrams) in the workspace/ directory.")
-    parts.append("")
-
-    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +59,7 @@ def execute_node(sandbox_path: str, node_index: int) -> dict:
 
     # Assemble prompt
     is_first = (node_index == 0)
-    prompt_content = _assemble_prompt(node, sandbox, is_first)
+    prompt_content = assemble_prompt(node, sandbox, is_first)
 
     # Write prompt.md for audit trail
     utils.write_text(office / "prompt.md", prompt_content)
@@ -224,11 +128,11 @@ def execute_node(sandbox_path: str, node_index: int) -> dict:
 
                 elif isinstance(msg, list):
                     for m in msg:
-                        _process_stream_msg(m, status, log_f)
+                        process_stream_message(m, status, log_f)
                     _update_status(status, project_status_path)
 
                 elif isinstance(msg, StreamMessage):
-                    _process_stream_msg(msg, status, log_f)
+                    process_stream_message(msg, status, log_f)
                     _update_status(status, project_status_path)
 
                 # Agent events
@@ -296,24 +200,6 @@ def execute_node(sandbox_path: str, node_index: int) -> dict:
         "num_turns": status.num_turns,
         "has_output": (office / "output.md").exists(),
     }
-
-
-def _process_stream_msg(msg: StreamMessage, status: StatusSnapshot, log_f) -> None:
-    """Update status and log from a stream message."""
-    if msg.content_type == "text" and msg.text:
-        status.phase = "running"
-        status.tool_name = ""
-        status.last_text_preview = msg.text.strip()[:80]
-        log_f.write(msg.text)
-        log_f.flush()
-    elif msg.content_type == "tool_use" and msg.tool_name:
-        status.phase = "tool"
-        status.tool_name = msg.tool_name
-        input_preview = ""
-        if msg.tool_input:
-            input_preview = json.dumps(msg.tool_input, ensure_ascii=False)[:120]
-        log_f.write(f"[tool:{msg.tool_name}] {input_preview}\n")
-        log_f.flush()
 
 
 _last_status_len = 0

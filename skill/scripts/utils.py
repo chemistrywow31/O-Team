@@ -265,3 +265,18 @@ def count_skills(skills_dir: Path) -> int:
 def count_rules(rules_dir: Path) -> int:
     """Count rule .md files (recursive)."""
     return count_md_files_recursive(rules_dir)
+
+
+def copy_team_config(team_path: Path, office: Path) -> None:
+    """Copy CLAUDE.md and .claude/ directory into the office folder."""
+    import shutil
+    src_claude_md = team_path / "CLAUDE.md"
+    if src_claude_md.exists():
+        shutil.copy2(src_claude_md, office / "CLAUDE.md")
+
+    src_claude_dir = team_path / ".claude"
+    dst_claude_dir = office / ".claude"
+    if src_claude_dir.is_dir():
+        if dst_claude_dir.exists():
+            shutil.rmtree(dst_claude_dir)
+        shutil.copytree(src_claude_dir, dst_claude_dir)

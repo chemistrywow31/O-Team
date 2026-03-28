@@ -368,3 +368,21 @@ def _extract_token_count(usage: Any) -> int | None:
 def is_complete(msg: Any) -> bool:
     """Check if a parsed message is a CompleteMessage."""
     return isinstance(msg, CompleteMessage)
+
+
+def process_stream_message(msg: StreamMessage, status: StatusSnapshot, log_f) -> None:
+    """Update status and log from a stream message."""
+    if msg.content_type == "text" and msg.text:
+        status.phase = "running"
+        status.tool_name = ""
+        status.last_text_preview = msg.text.strip()[:80]
+        log_f.write(msg.text)
+        log_f.flush()
+    elif msg.content_type == "tool_use" and msg.tool_name:
+        status.phase = "tool"
+        status.tool_name = msg.tool_name
+        input_preview = ""
+        if msg.tool_input:
+            input_preview = json.dumps(msg.tool_input, ensure_ascii=False)[:120]
+        log_f.write(f"[tool:{msg.tool_name}] {input_preview}\n")
+        log_f.flush()

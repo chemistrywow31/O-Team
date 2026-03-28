@@ -48,9 +48,9 @@ def clean_runs(
         return {"success": True, "removed": 0, "message": "No runs directory"}
 
     if run_id:
-        # Remove specific run
-        target = runs_dir / run_id
-        if not target.exists():
+        # Remove specific run (search both runs/ and archive/)
+        target = utils.find_run_dir(run_id, proj_dir)
+        if not target:
             return {"success": False, "error": f"Run '{run_id}' not found"}
         size = _get_dir_size(target)
         shutil.rmtree(target)
@@ -61,9 +61,14 @@ def clean_runs(
             "message": f"Removed run '{run_id}' ({_human_size(size)})",
         }
 
-    # Collect targets
+    # Collect targets (from both runs/ and archive/)
+    all_dirs = list(runs_dir.iterdir()) if runs_dir.exists() else []
+    archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
+    if archive_dir.exists():
+        all_dirs.extend(archive_dir.iterdir())
+
     targets = []
-    for entry in sorted(runs_dir.iterdir()):
+    for entry in sorted(all_dirs):
         if not entry.is_dir():
             continue
         meta_file = entry / "meta.json"
@@ -82,9 +87,10 @@ def clean_runs(
             targets.append((entry, state))
 
     if not clean_all and not state_filter:
-        # Just show summary
+        # Just show summary (include both runs/ and archive/)
         total_size = 0
         run_count = 0
+        archive_count = 0
         state_counts = {}
         for entry in runs_dir.iterdir():
             if not entry.is_dir():
@@ -101,10 +107,19 @@ def clean_runs(
                     pass
             state_counts[state] = state_counts.get(state, 0) + 1
 
+        archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
+        if archive_dir.exists():
+            for entry in archive_dir.iterdir():
+                if not entry.is_dir():
+                    continue
+                archive_count += 1
+                total_size += _get_dir_size(entry)
+
         return {
             "success": True,
             "summary": True,
             "total_runs": run_count,
+            "archived_runs": archive_count,
             "total_size": _human_size(total_size),
             "by_state": state_counts,
         }
@@ -144,7 +159,9 @@ def main():
         utils.print_json(result)
     else:
         if result.get("summary"):
-            print(f"📊 Runs: {result['total_runs']}  Size: {result['total_size']}")
+            archived = result.get("archived_runs", 0)
+            archive_label = f"  Archived: {archived}" if archived else ""
+            print(f"📊 Runs: {result['total_runs']}{archive_label}  Size: {result['total_size']}")
             for state, count in result["by_state"].items():
                 print(f"   {state}: {count}")
         elif result["success"]:

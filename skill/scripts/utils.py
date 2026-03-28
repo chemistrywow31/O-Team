@@ -121,6 +121,29 @@ def generate_run_id() -> str:
     return uuid.uuid4().hex[:8]
 
 
+ARCHIVE_DIR_NAME = "archive"
+
+
+def find_run_dir(run_id: str, project_dir: Path) -> Path | None:
+    """Find a run directory by ID, searching both runs/ and archive/.
+
+    Returns the Path if found, otherwise None.
+    """
+    # Direct match in runs/
+    direct = project_dir / RUNS_DIR_NAME / run_id
+    if direct.exists():
+        return direct
+
+    # Search archive/ for <name>-<run_id> pattern
+    archive_dir = project_dir / ARCHIVE_DIR_NAME
+    if archive_dir.exists():
+        for entry in archive_dir.iterdir():
+            if entry.is_dir() and entry.name.endswith(f"-{run_id}"):
+                return entry
+
+    return None
+
+
 def slugify(name: str) -> str:
     """Convert a name to kebab-case slug."""
     import re

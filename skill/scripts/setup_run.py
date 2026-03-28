@@ -201,19 +201,24 @@ def _find_source_run(
     for the same pipeline that has the required node outputs.
     """
     runs_dir = proj_dir / utils.RUNS_DIR_NAME
-    if not runs_dir.exists():
+    if not runs_dir.exists() and not (proj_dir / utils.ARCHIVE_DIR_NAME).exists():
         return None
 
     if run_id:
-        candidate = runs_dir / run_id
-        if candidate.exists() and (candidate / "meta.json").exists():
+        candidate = utils.find_run_dir(run_id, proj_dir)
+        if candidate and (candidate / "meta.json").exists():
             return candidate
         return None
 
     # Find latest run for this pipeline with completed nodes before start_index
+    all_dirs = list(runs_dir.iterdir()) if runs_dir.exists() else []
+    archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
+    if archive_dir.exists():
+        all_dirs.extend(archive_dir.iterdir())
+
     best = None
     best_time = ""
-    for entry in runs_dir.iterdir():
+    for entry in all_dirs:
         if not entry.is_dir():
             continue
         meta_file = entry / "meta.json"

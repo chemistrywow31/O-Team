@@ -15,6 +15,7 @@ Each node runs in its own context with its own team identity.
 """
 
 import argparse
+import re
 import shutil
 import subprocess
 import sys
@@ -333,13 +334,12 @@ def _start_new_run(
 
 def _resume_run(run_id: str, project_dir: Path) -> dict:
     """Resume a paused or errored run."""
-    runs_dir = project_dir / utils.RUNS_DIR_NAME
-    sandbox = runs_dir / run_id
+    sandbox = utils.find_run_dir(run_id, project_dir)
 
-    if not sandbox.exists():
+    if not sandbox:
         return {
             "success": False,
-            "error": f"Run '{run_id}' not found at {sandbox}",
+            "error": f"Run '{run_id}' not found in runs/ or archive/",
         }
 
     meta_file = sandbox / "meta.json"
@@ -472,6 +472,11 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
     clear_status(project_status_path)
     print(f"\n🏁 Pipeline '{run_state['pipeline_name']}' complete")
     print(f"   Run ID: {run_state['run_id']}")
+
+    # Prompt user to name and archive this run
+    project_dir = sandbox.parent.parent
+    sandbox = _prompt_archive_run(run_state, sandbox, project_dir)
+
     print(f"   最終產出: {sandbox / nodes[-1]['id'] / 'output.md'}")
 
     return {
@@ -485,6 +490,43 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _prompt_archive_run(run_state: dict, sandbox: Path, project_dir: Path) -> Path:
+    """Ask user if they want to name this run and move it to archive.
+
+    Returns the (possibly new) sandbox path.
+    """
+    try:
+        answer = input("\n📦 要為這次 run 命名嗎？(直接 Enter 跳過): ").strip()
+    except (EOFError, KeyboardInterrupt):
+        return sandbox
+
+    if not answer:
+        return sandbox
+
+    # Sanitize: keep alphanumeric, dash, underscore, CJK characters
+    run_name = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', answer)
+    if not run_name:
+        return sandbox
+
+    run_id = run_state["run_id"]
+    new_folder_name = f"{run_name}-{run_id}"
+
+    # Create archive directory and move
+    archive_dir = project_dir / utils.ARCHIVE_DIR_NAME
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    new_path = archive_dir / new_folder_name
+    sandbox.rename(new_path)
+
+    # Update meta.json with run name
+    run_state["run_name"] = run_name
+    run_state["archived"] = True
+    utils.write_json(new_path / "meta.json", run_state)
+
+    print(f"   📁 已歸檔至: {new_path.relative_to(project_dir)}")
+    return new_path
 
 
 def _save_state(run_state: dict, sandbox: Path) -> None:

@@ -40,9 +40,9 @@ def approve_node(
         }
 
     proj_dir = utils.ensure_project_dir(project_dir)
-    sandbox = proj_dir / utils.RUNS_DIR_NAME / run_id
+    sandbox = utils.find_run_dir(run_id, proj_dir)
 
-    if not sandbox.exists():
+    if not sandbox:
         return {
             "success": False,
             "error": f"Run '{run_id}' not found",

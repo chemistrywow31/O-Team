@@ -19,9 +19,9 @@ from .stream_parser import STATUS_FILE_NAME
 def check_status(run_id: str, project_dir: Path | None = None) -> dict:
     """Get the current status of a pipeline run."""
     proj_dir = utils.ensure_project_dir(project_dir)
-    sandbox = proj_dir / utils.RUNS_DIR_NAME / run_id
+    sandbox = utils.find_run_dir(run_id, proj_dir)
 
-    if not sandbox.exists():
+    if not sandbox:
         return {"success": False, "error": f"Run '{run_id}' not found"}
 
     meta_file = sandbox / "meta.json"

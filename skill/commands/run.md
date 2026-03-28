@@ -39,9 +39,10 @@ You are the **orchestrator**. You execute each node one at a time, report progre
 
 - Check for previous runs: `python -m scripts.list_runs --json`
 - If previous runs exist for this pipeline, AskUserQuestion:
-  - "Start fresh from the beginning"
-  - "Resume from node N (uses previous results for earlier nodes)"
+  - "Start fresh" — create a new run from scratch (previous runs are kept)
+  - "Resume from node N" — reuse previous results for earlier nodes, continue from node N
   - Show completed nodes from the latest run for context
+- NOTE: "Start fresh" always creates a new run with a new ID. Previous runs are never deleted — they remain in runs/ or archive/. Make this clear in the option description so users know old runs are preserved.
 - If "Resume from node N": ask which node number, save as `from_node`
 - AskUserQuestion: "Provide input for the {first/starting} node:"
   - If resuming from node N and user says "use previous" or similar, skip input (script defaults to previous node's output)

@@ -34,7 +34,14 @@ npx github:chemistrywow31/O-Team
 
 ### What is O-Team?
 
-O-Team lets you chain AI agent teams into sequential pipelines:
+O-Team is **prompt chaining, evolved**.
+
+Traditional prompt chaining passes output from one prompt to the next within a single session. It works for simple tasks, but breaks down at scale — context degrades, errors compound, and you can't intervene mid-chain.
+
+O-Team takes each link in the chain and gives it:
+- **Its own process** — a separate `claude` instance with a fresh context window
+- **Its own identity** — a team-specific `CLAUDE.md` with specialized expertise
+- **Human checkpoints** — gate nodes where you review, edit, or reject before continuing
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐
@@ -42,17 +49,11 @@ O-Team lets you chain AI agent teams into sequential pipelines:
 │ Research │     │ Evaluate │     │  Brief   │
 │  [auto]  │     │  [auto]  │     │  [gate]  │
 └──────────┘     └──────────┘     └──────────┘
+  fresh context    fresh context    fresh context
+                                   ↑ you review here
 ```
 
-- **Each node** runs as a separate `claude` process with its own context
-- **auto** nodes pass results forward automatically
-- **gate** nodes pause for your review (approve / reject / edit)
-
-### Why?
-
-Running one AI agent on a focused task works well. Running a complex multi-step project in a single session doesn't — context degrades, mistakes compound, no checkpoints.
-
-O-Team solves this by giving each team its own isolated context. They only communicate through structured handoff files, and you can review at any point.
+The result: multi-step AI workflows that stay sharp at every stage, with human oversight where it matters.
 
 ### Quick Start (without demo)
 
@@ -199,7 +200,14 @@ npx github:chemistrywow31/O-Team
 
 ### O-Team 是什麼？
 
-O-Team 讓你把多個 AI agent 團隊串成流水線：
+O-Team 是 **Prompt Chaining 的進化版**。
+
+傳統的 prompt chaining 在同一個 session 中把前一個 prompt 的輸出傳給下一個。簡單任務沒問題，但規模一大就會崩 — 上下文退化、錯誤累積、無法中途介入。
+
+O-Team 把 chain 中的每一環獨立出來，賦予：
+- **獨立程序** — 每個節點是一個全新的 `claude` 實例，上下文從零開始
+- **專屬身份** — 每個團隊有自己的 `CLAUDE.md`，定義專業領域
+- **人工檢查點** — gate 節點讓你審核、修改、退回再繼續
 
 ```
 ┌──────────┐     ┌──────────┐     ┌──────────┐
@@ -207,17 +215,11 @@ O-Team 讓你把多個 AI agent 團隊串成流水線：
 │  調查    │     │  分析     │     │  建議    │
 │  [auto]  │     │  [auto]  │     │  [gate]  │
 └──────────┘     └──────────┘     └──────────┘
+  全新上下文       全新上下文       全新上下文
+                                   ↑ 你在這裡審核
 ```
 
-- **每個節點**都是獨立的 `claude` 程序，有自己的上下文
-- **auto** 節點自動傳遞結果
-- **gate** 節點暫停等你審核（approve / reject / edit）
-
-### 為什麼需要？
-
-單一 AI 處理專注任務很強。但複雜的多步驟專案在同一個 session 裡做會出問題 — 上下文退化、錯誤累積、沒有檢查點。
-
-O-Team 給每個團隊獨立的上下文，只透過結構化的交接檔案溝通，你可以在任何節點介入審查。
+結果：多步驟 AI 工作流在每個階段都保持精準，關鍵環節有人工把關。
 
 ### 快速開始（不用 demo）
 

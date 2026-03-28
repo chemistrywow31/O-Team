@@ -44,7 +44,8 @@ def clean_runs(
     proj_dir = utils.ensure_project_dir(project_dir)
     runs_dir = proj_dir / utils.RUNS_DIR_NAME
 
-    if not runs_dir.exists():
+    archive_dir_path = proj_dir / utils.ARCHIVE_DIR_NAME
+    if not runs_dir.exists() and not archive_dir_path.exists():
         return {"success": True, "removed": 0, "message": "No runs directory"}
 
     if run_id:
@@ -92,20 +93,21 @@ def clean_runs(
         run_count = 0
         archive_count = 0
         state_counts = {}
-        for entry in runs_dir.iterdir():
-            if not entry.is_dir():
-                continue
-            run_count += 1
-            total_size += _get_dir_size(entry)
-            meta_file = entry / "meta.json"
-            state = "UNKNOWN"
-            if meta_file.exists():
-                try:
-                    meta = utils.read_json(meta_file)
-                    state = meta.get("state", "UNKNOWN")
-                except Exception:
-                    pass
-            state_counts[state] = state_counts.get(state, 0) + 1
+        if runs_dir.exists():
+            for entry in runs_dir.iterdir():
+                if not entry.is_dir():
+                    continue
+                run_count += 1
+                total_size += _get_dir_size(entry)
+                meta_file = entry / "meta.json"
+                state = "UNKNOWN"
+                if meta_file.exists():
+                    try:
+                        meta = utils.read_json(meta_file)
+                        state = meta.get("state", "UNKNOWN")
+                    except Exception:
+                        pass
+                state_counts[state] = state_counts.get(state, 0) + 1
 
         archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
         if archive_dir.exists():

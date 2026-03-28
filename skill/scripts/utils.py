@@ -18,6 +18,7 @@ CONFIG_FILE = GLOBAL_DIR / "config.json"
 PROJECT_DIR_NAME = ".o-team"
 PIPELINES_DIR_NAME = "pipelines"
 RUNS_DIR_NAME = "runs"
+ARCHIVE_DIR_NAME = "archive"
 
 DEFAULT_TIMEOUT = 1800  # 30 minutes
 DEFAULT_COMMAND = "claude -p {prompt_file} --dangerously-skip-permissions"
@@ -119,9 +120,6 @@ def write_text(path: Path, content: str) -> None:
 def generate_run_id() -> str:
     """Generate a short UUID for run identification (first 8 chars)."""
     return uuid.uuid4().hex[:8]
-
-
-ARCHIVE_DIR_NAME = "archive"
 
 
 def find_run_dir(run_id: str, project_dir: Path) -> Path | None:

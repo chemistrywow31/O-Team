@@ -329,7 +329,7 @@ def _start_new_run(
             utils.write_text(input_path, input_content)
 
     # Start execution
-    return _execute_pipeline(run_state, sandbox)
+    return _execute_pipeline(run_state, sandbox, project_dir)
 
 
 def _resume_run(run_id: str, project_dir: Path) -> dict:
@@ -357,10 +357,11 @@ def _resume_run(run_id: str, project_dir: Path) -> dict:
             "error": f"Run '{run_id}' is in state '{run_state['state']}', cannot resume (must be PAUSED or ERROR)",
         }
 
-    return _execute_pipeline(run_state, sandbox)
+    project_dir = sandbox.parent.parent  # .o-team/ directory
+    return _execute_pipeline(run_state, sandbox, project_dir)
 
 
-def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
+def _execute_pipeline(run_state: dict, sandbox: Path, project_dir: Path) -> dict:
     """Execute pipeline nodes sequentially from current position."""
     run_state["state"] = "RUNNING"
     run_state["started_at"] = run_state.get("started_at") or utils.now_iso()
@@ -370,7 +371,7 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
     total = len(nodes)
 
     # Project-local status file (in .o-team/ directory)
-    project_status_path = sandbox.parent.parent / STATUS_FILE_NAME
+    project_status_path = project_dir / STATUS_FILE_NAME
 
     for i in range(run_state["current_node_index"], total):
         node = nodes[i]
@@ -474,16 +475,18 @@ def _execute_pipeline(run_state: dict, sandbox: Path) -> dict:
     print(f"   Run ID: {run_state['run_id']}")
 
     # Prompt user to name and archive this run
-    project_dir = sandbox.parent.parent
-    sandbox = _prompt_archive_run(run_state, sandbox, project_dir)
+    if sys.stdin.isatty():
+        final_sandbox = _prompt_archive_run(run_state, sandbox, project_dir)
+    else:
+        final_sandbox = sandbox
 
-    print(f"   最終產出: {sandbox / nodes[-1]['id'] / 'output.md'}")
+    print(f"   最終產出: {final_sandbox / nodes[-1]['id'] / 'output.md'}")
 
     return {
         "success": True,
         "run_id": run_state["run_id"],
         "state": "COMPLETE",
-        "output_path": str(sandbox / nodes[-1]["id"] / "output.md"),
+        "output_path": str(final_sandbox / nodes[-1]["id"] / "output.md"),
     }
 
 

@@ -1,14 +1,23 @@
 ---
-name: o-team:status
-description: "[Alias → /ot:status] Check run status"
-argument-hint: "<run-id>"
+name: ot:status
+description: Check run status — live or by run-id
+argument-hint: "[<run-id> | live]"
 allowed-tools:
   - Read
   - Bash
 ---
 
-This command has a shorter alias: `/ot:status`
+# Run Status
 
-Follow the exact same flow as `/ot:status`.
+## Script
 
-Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`
+```
+PYTHONPATH=.claude/skills/ot python -m scripts.<module> <args> --json
+```
+
+## Actions
+
+- No argument or `live`: `python -m scripts.check_status --live --json`
+- With run-id: `python -m scripts.check_status <run-id> --json`
+
+Present node states with icons: PENDING, RUNNING, COMPLETE, ERROR, PAUSED, SKIPPED.

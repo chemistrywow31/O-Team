@@ -15,7 +15,7 @@ allowed-tools:
 ## Script
 
 ```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json
+PYTHONPATH=.claude/skills/ot python -m scripts.<module> <args> --json
 ```
 
 ## Overview
@@ -40,7 +40,7 @@ For this demo, I'll create 3 lightweight teams for you.
 ```
 
 ### Actions:
-1. Find the demo team templates in the skill directory: `.claude/skills/o-team/templates/demo-teams/`
+1. Find the demo team templates in the skill directory: `.claude/skills/ot/templates/demo-teams/`
    - If the templates directory doesn't exist, look for it relative to SKILL.md location
 2. Copy the 3 team folders to `.o-team/demo-teams/` in the project:
    - `.o-team/demo-teams/scout/`

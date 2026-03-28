@@ -16,7 +16,7 @@ allowed-tools:
 ## Script
 
 ```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json
+PYTHONPATH=.claude/skills/ot python -m scripts.<module> <args> --json
 ```
 
 ## Actions

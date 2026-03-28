@@ -47,12 +47,12 @@ Enable users to register A-Team generated agent teams, build named execution pip
 
 ## Script Location
 
-All scripts are in the `scripts/` directory relative to this SKILL.md (`.claude/skills/o-team/scripts/`).
+All scripts are in the `scripts/` directory relative to this SKILL.md (`.claude/skills/ot/scripts/`).
 
 **IMPORTANT**: Run scripts from the **project root** (not the skill directory), using `PYTHONPATH` to locate the module:
 
 ```
-PYTHONPATH=.claude/skills/o-team python -m scripts.<module_name> <args> --json
+PYTHONPATH=.claude/skills/ot python -m scripts.<module_name> <args> --json
 ```
 
 This ensures `.o-team/` data (pipelines, runs) is created in the project root, not inside the skill directory. The `--json` flag produces machine-readable output. Always use `--json` and parse the result.

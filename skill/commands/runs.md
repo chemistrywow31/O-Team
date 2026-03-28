@@ -1,13 +1,20 @@
 ---
-name: o-team:runs
-description: "[Alias → /ot:runs] List run history"
+name: ot:runs
+description: List run history
 allowed-tools:
   - Read
   - Bash
 ---
 
-This command has a shorter alias: `/ot:runs`
+# Run History
 
-Follow the exact same flow as `/ot:runs`.
+## Script
 
-Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`
+```
+PYTHONPATH=.claude/skills/ot python -m scripts.<module> <args> --json
+```
+
+## Flow
+
+1. Run `python -m scripts.list_runs --json`
+2. Present as table: run ID, pipeline name, state, progress, timestamps

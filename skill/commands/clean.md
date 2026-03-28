@@ -1,15 +1,24 @@
 ---
-name: o-team:clean
-description: "[Alias → /ot:clean] Clean up run directories"
-argument-hint: "[run-id | --all | --state COMPLETE]"
+name: ot:clean
+description: Clean up run directories
+argument-hint: "[<run-id> | --all | --state COMPLETE]"
 allowed-tools:
   - Read
   - Bash
   - AskUserQuestion
 ---
 
-This command has a shorter alias: `/ot:clean`
+# Clean Runs
 
-Follow the exact same flow as `/ot:clean`.
+## Script
 
-Script: `PYTHONPATH=.claude/skills/o-team python -m scripts.<module> <args> --json`
+```
+PYTHONPATH=.claude/skills/ot python -m scripts.<module> <args> --json
+```
+
+## Actions
+
+- No argument: `python -m scripts.clean_runs --json` → show summary, ask what to clean
+- With run-id: `python -m scripts.clean_runs <run-id> --json`
+- With `--all`: `python -m scripts.clean_runs --all --json`
+- With `--state`: `python -m scripts.clean_runs --state <STATE> --json`

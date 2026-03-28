@@ -8,7 +8,7 @@ const { execSync } = require("child_process");
 // Config
 // ---------------------------------------------------------------------------
 
-const SKILL_NAME = "o-team";
+const SKILL_NAME = "ot";
 const SKILL_SRC = path.join(__dirname, "..", "skill");
 const TARGET_DIR = path.join(process.cwd(), ".claude", "skills", SKILL_NAME);
 
@@ -170,13 +170,25 @@ if (isUninstall) {
     console.log(`  ⚠️  Not installed at: ${TARGET_DIR}`);
   }
   // Also remove commands
-  const cmdDir = path.join(process.cwd(), ".claude", "commands", "o-team");
+  const cmdDir = path.join(process.cwd(), ".claude", "commands", "ot");
   if (fs.existsSync(cmdDir)) {
     fs.rmSync(cmdDir, { recursive: true });
     console.log(`  ✅ Removed commands: ${cmdDir}`);
   }
   console.log("");
   process.exit(0);
+}
+
+// Clean up old o-team installation if it exists
+const OLD_SKILL_DIR = path.join(process.cwd(), ".claude", "skills", "o-team");
+const OLD_CMD_DIR = path.join(process.cwd(), ".claude", "commands", "o-team");
+if (fs.existsSync(OLD_SKILL_DIR)) {
+  fs.rmSync(OLD_SKILL_DIR, { recursive: true });
+  console.log("  🔄 Removed old .claude/skills/o-team/ (migrated to ot/)");
+}
+if (fs.existsSync(OLD_CMD_DIR)) {
+  fs.rmSync(OLD_CMD_DIR, { recursive: true });
+  console.log("  🔄 Removed old .claude/commands/o-team/");
 }
 
 // Check if already installed
@@ -209,9 +221,9 @@ try {
   process.exit(1);
 }
 
-// Copy command files to .claude/commands/o-team/
+// Copy command files to .claude/commands/ot/
 const COMMANDS_SRC = path.join(TARGET_DIR, "commands");
-const COMMANDS_DIR = path.join(process.cwd(), ".claude", "commands", "o-team");
+const COMMANDS_DIR = path.join(process.cwd(), ".claude", "commands", "ot");
 
 try {
   if (fs.existsSync(COMMANDS_SRC)) {
@@ -222,7 +234,7 @@ try {
         path.join(COMMANDS_DIR, file)
       );
     }
-    console.log("  ✅ Commands installed to .claude/commands/o-team/");
+    console.log("  ✅ Commands installed to .claude/commands/ot/");
   }
 } catch (err) {
   console.log(`  ⚠️  Failed to install commands: ${err.message}`);

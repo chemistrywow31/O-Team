@@ -23,7 +23,7 @@ O-Team supports English (en) and Traditional Chinese (zh-TW).
 3. System `LANG` / `LC_ALL` environment variable
 4. Fallback: English
 
-**For Claude (the orchestrator)**: After detecting the language, adapt your own response text to match. If zh-TW, respond in Traditional Chinese. If en, respond in English. The banner ASCII art is always English, but the subtitle line should match the locale.
+**For Claude (the orchestrator)**: Before executing any command, detect the language via `python -m scripts.config detect --json`. ALL user-facing text — messages, options, explanations, status updates — MUST be in the detected language. The example text in command files is written in English for readability but you MUST translate it to the user's language. If zh-TW, respond entirely in Traditional Chinese. If en, respond in English. The banner ASCII art is always English.
 
 **For script output**: Scripts use the `i18n.t()` function internally.
 

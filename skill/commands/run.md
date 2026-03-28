@@ -13,6 +13,10 @@ allowed-tools:
 
 # Run Pipeline
 
+## Language
+
+Detect language: `PYTHONPATH=.claude/skills/ot python -m scripts.config detect --json`. All user-facing text MUST be in the detected language. Example text below is in English — translate it.
+
 ## Script
 
 ```

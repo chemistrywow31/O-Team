@@ -12,6 +12,10 @@ allowed-tools:
 
 # O-Team Guided Demo
 
+## Language
+
+**IMPORTANT**: Before starting, detect language: `PYTHONPATH=.claude/skills/ot python -m scripts.config detect --json`. All user-facing text below is in English as examples — you MUST translate everything to the detected language (e.g., Traditional Chinese if zh-TW).
+
 ## Script
 
 ```

@@ -11,6 +11,10 @@ allowed-tools:
 
 # Pipeline Management
 
+## Language
+
+Detect language: `PYTHONPATH=.claude/skills/ot python -m scripts.config detect --json`. All user-facing text MUST be in the detected language.
+
 ## Script
 
 ```

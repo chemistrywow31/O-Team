@@ -58,14 +58,13 @@ The result: multi-step AI workflows that stay sharp at every stage, with human o
 ### Quick Start (without demo)
 
 ```bash
-# 1. Register teams (created by A-Team or manually)
-/ot:reg add ./my-teams
+# With teams
+/ot:reg add ./my-teams     # register teams
+/ot:build                  # build a team-based pipeline
+/ot:run                    # execute
 
-# 2. Build a pipeline interactively
-/ot:build
-
-# 3. Run it
-/ot:run
+# Without teams — pure prompt chain
+/ot:chain                  # build interactively, or: /ot:chain chain.md
 ```
 
 ### Commands
@@ -73,10 +72,11 @@ The result: multi-step AI workflows that stay sharp at every stage, with human o
 | Command | Description |
 |---------|-------------|
 | `/ot:demo` | Guided tutorial — start here |
+| `/ot:chain [path]` | Build a pipeline from a prompt chain (no teams required) |
 | `/ot:reg` | List registered teams |
 | `/ot:reg add <path>` | Register team(s) from path |
 | `/ot:reg rm <slug>` | Remove a team |
-| `/ot:build` | Build a pipeline interactively |
+| `/ot:build` | Build a team-based pipeline interactively |
 | `/ot:run [name]` | Run a pipeline |
 | `/ot:pipe` | List saved pipelines |
 | `/ot:pipe show <name>` | Show pipeline details |
@@ -95,11 +95,45 @@ All commands also work with the `o-team:` prefix:
 
 ### How It Works
 
-1. **Teams** are folders with a `CLAUDE.md` that defines the team's identity and capabilities. Create them with [A-Team](https://github.com/chemistrywow31/A-Team) or write them yourself.
+1. **Nodes** are either **teams** (folders with `CLAUDE.md` defining an identity) or **pure prompts** (no team — the prompt itself is all the instruction). A pipeline can mix both.
 
-2. **Pipelines** chain registered teams in order. Each team becomes a node. You set each node to `auto` (proceed automatically) or `gate` (pause for review).
+2. **Pipelines** chain nodes in order. Each node is `auto` (proceed automatically) or `gate` (pause for your review).
 
-3. **Execution** creates an isolated sandbox for each run. Each node gets its own office folder with the team's config, runs as an independent `claude -p` process, and writes `output.md` which becomes the next node's input.
+3. **Execution** creates an isolated sandbox per run. Each node gets its own office folder, runs as an independent `claude -p` process, and writes `output.md` which becomes the next node's input.
+
+### Per-node controls
+
+Every node can independently set:
+
+| Field | Purpose |
+|---|---|
+| `model` | Route cheap tasks to Haiku, reasoning to Sonnet, synthesis to Opus |
+| `effort` | Thinking level: `low` / `medium` / `high` / `xhigh` / `max`. Delivered via a per-subprocess env var — parallel runs don't race. |
+| `mode` | `auto` (hands-free) or `gate` (pause for approve / edit / reject / skip) |
+| `identity` | Written as CLAUDE.md in the node's office folder |
+| `rules` | List of markdown files copied into the node's `.claude/rules/` |
+| `timeout` | Subprocess timeout (seconds) |
+
+### Cross-node references
+
+Later nodes can pull in outputs from any prior step — not just the immediately preceding one:
+
+```yaml
+- id: 03-report
+  prompt: |
+    Combine these inputs:
+
+    Original facts: {{node:01-extract}}
+    Analysis:       {{node:02-analyse}}
+
+    ...produce the final brief.
+```
+
+At prompt-assembly time each `{{node:<id>}}` tag is replaced with `<output id="<id>">...content of that node's output.md...</output>`. Every completed node's output is also auto-copied to `workspace/<node_id>.md`, so a node can instead read it via the Read tool if the content is too large to inline.
+
+### Example pipeline
+
+See [`skill/templates/example-prompt-chain.yaml`](skill/templates/example-prompt-chain.yaml) for a complete example demonstrating every feature — inline and external prompts, `{{node:<id>}}` cross-references, per-node `model` / `effort`, `identity`, `rules`, and mixed `auto` / `gate` modes.
 
 ### Why O-Team
 
@@ -168,18 +202,20 @@ Supports English and Traditional Chinese (繁體中文).
 ├── config.json                      # Settings
 └── status.json                      # Live status (transient)
 
-{project}/.o-team/                   # Per-project
-├── pipelines/*.yaml                 # Saved pipelines (git-committable)
-└── runs/{uuid}/                     # Execution sandboxes (gitignored)
-    ├── meta.json                    # Run state
-    ├── workspace/                   # Shared across nodes
-    └── {node-id}/                   # Node office folder
-        ├── CLAUDE.md                # Team identity (copied)
-        ├── .claude/                 # Team config (copied)
-        ├── input.md                 # Input from previous node
-        ├── output.md                # This node's deliverable
-        ├── prompt.md                # Assembled prompt (audit)
-        └── run.log                  # Execution log
+{project}/.o-team/                        # Per-project
+├── pipelines/*.yaml                      # Saved pipelines (git-committable)
+├── runs/{uuid}/                          # Execution sandboxes (gitignored)
+│   ├── meta.json                          # Run state
+│   ├── workspace/                         # Shared across nodes
+│   │   └── {prev-node-id}.md              # Auto-published prior outputs
+│   └── {node-id}/                         # Node office folder
+│       ├── CLAUDE.md                      # Team identity (or prompt-node stub)
+│       ├── .claude/                       # Team config (copied)
+│       ├── input.md                       # Input from previous node
+│       ├── output.md                      # This node's deliverable
+│       ├── prompt.md                      # Assembled prompt (audit)
+│       └── run.log                        # Execution log
+└── archive/YYYY/MM/DD/{name}-{uuid}/     # Archived runs (date-partitioned)
 ```
 
 ### License
@@ -233,14 +269,13 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 ### 快速開始（不用 demo）
 
 ```bash
-# 1. 註冊團隊（用 A-Team 建立或手動建立）
-/ot:reg add ./my-teams
+# 有團隊
+/ot:reg add ./my-teams     # 註冊團隊
+/ot:build                  # 建立以團隊為節點的 pipeline
+/ot:run                    # 執行
 
-# 2. 互動式建立 pipeline
-/ot:build
-
-# 3. 執行
-/ot:run
+# 沒團隊 — 純 prompt chain
+/ot:chain                  # 互動建立，或：/ot:chain chain.md
 ```
 
 ### 指令一覽
@@ -248,10 +283,11 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 | 指令 | 說明 |
 |------|------|
 | `/ot:demo` | 教學導覽 — 從這裡開始 |
+| `/ot:chain [path]` | 從 prompt chain 建立 pipeline（不需團隊） |
 | `/ot:reg` | 列出已註冊的團隊 |
 | `/ot:reg add <path>` | 從路徑註冊團隊 |
 | `/ot:reg rm <slug>` | 移除團隊 |
-| `/ot:build` | 互動式建立 pipeline |
+| `/ot:build` | 互動式建立團隊 pipeline |
 | `/ot:run [name]` | 執行 pipeline |
 | `/ot:pipe` | 列出已存的 pipeline |
 | `/ot:pipe show <name>` | 顯示 pipeline 詳情 |
@@ -270,11 +306,43 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 
 ### 運作方式
 
-1. **團隊**是包含 `CLAUDE.md` 的資料夾，定義團隊的身份與能力。用 [A-Team](https://github.com/chemistrywow31/A-Team) 生成或手動建立。
+1. **節點**可以是**團隊**（包含 `CLAUDE.md` 定義身份的資料夾）或**純 prompt**（不需團隊，prompt 本身就是全部指令）。Pipeline 可以混用兩種。
 
-2. **Pipeline** 把註冊的團隊依序串接。每個團隊成為一個節點，可設為 `auto`（自動繼續）或 `gate`（暫停審核）。
+2. **Pipeline** 把節點依序串接。每個節點是 `auto`（自動繼續）或 `gate`（暫停審核）。
 
 3. **執行**時為每次 run 建立隔離的 sandbox。每個節點有自己的辦公室資料夾、獨立的 `claude -p` 程序，產出的 `output.md` 成為下一個節點的輸入。
+
+### 每個節點都可獨立設定
+
+| 欄位 | 用途 |
+|---|---|
+| `model` | 便宜任務用 Haiku、推理用 Sonnet、最終統合用 Opus |
+| `effort` | 思考強度：`low` / `medium` / `high` / `xhigh` / `max`。透過 subprocess 獨立的環境變數傳遞，多 chain 平行不互相干擾 |
+| `mode` | `auto`（全自動）或 `gate`（暫停審核：核准/編輯/退回/跳過） |
+| `identity` | 寫入節點辦公室的 CLAUDE.md |
+| `rules` | Markdown 檔案清單，複製到節點的 `.claude/rules/` |
+| `timeout` | Subprocess 逾時秒數 |
+
+### 跨節點引用
+
+後續節點可以取用任何先前步驟的 output，不只上一步：
+
+```yaml
+- id: 03-report
+  prompt: |
+    整合以下資料：
+
+    原始事實：{{node:01-extract}}
+    分析結果：{{node:02-analyse}}
+
+    ...產出最終報告。
+```
+
+組 prompt 時，每個 `{{node:<id>}}` tag 會被替換成 `<output id="<id>">...該節點 output.md 的內容...</output>`。每個完成節點的 output 也會自動複製到 `workspace/<node_id>.md`，內容太大時可以讓節點改用 Read tool 讀取。
+
+### 範例 pipeline
+
+完整範例見 [`skill/templates/example-prompt-chain.yaml`](skill/templates/example-prompt-chain.yaml)，涵蓋所有功能：inline 與外部 prompt、`{{node:<id>}}` 跨節點引用、節點級 `model` / `effort`、`identity`、`rules`、`auto` / `gate` 混用。
 
 ### 為什麼選 O-Team
 

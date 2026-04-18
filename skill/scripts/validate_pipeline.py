@@ -8,6 +8,7 @@ team reference integrity, and prompt completeness.
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -16,11 +17,25 @@ from .prompt import NODE_REF_PATTERN, resolve_prompt_text
 from .validate_path import validate_team_path
 
 
+KNOWN_NODE_FIELDS = {
+    "id", "mode", "team", "team_path",
+    "prompt", "prompt_file",
+    "identity", "rules",
+    "model", "effort",
+    "timeout",
+}
+
+VALID_MODES = {"auto", "gate"}
+VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
+ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-.]*$")
+
+
 def _is_prompt_node(node: dict) -> bool:
     """Check if a node is a prompt-only node (no team required)."""
     has_team = bool(node.get("team"))
-    has_prompt = bool(node.get("prompt", "").strip())
-    has_prompt_file = bool(node.get("prompt_file", "").strip())
+    has_prompt = bool(str(node.get("prompt", "")).strip())
+    has_prompt_file = bool(str(node.get("prompt_file", "")).strip())
     return not has_team and (has_prompt or has_prompt_file)
 
 
@@ -96,7 +111,29 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
     if result["issues"]:
         return result
 
-    # Validate version
+    # Validate top-level field types
+    name = pipeline.get("name")
+    if not isinstance(name, str) or not name.strip():
+        result["issues"].append({
+            "check": "name_type",
+            "message": f"name 必須是非空字串，目前是: {type(name).__name__}",
+        })
+
+    slug = pipeline.get("slug")
+    if slug is not None and (not isinstance(slug, str) or not slug.strip()):
+        result["issues"].append({
+            "check": "slug_type",
+            "message": f"slug 如果有提供必須是非空字串",
+        })
+
+    objective = pipeline.get("objective")
+    if objective is not None and not isinstance(objective, str):
+        result["warnings"].append({
+            "check": "objective_type",
+            "message": f"objective 應為字串，目前是: {type(objective).__name__}",
+        })
+
+    # Validate version (accept both "1" and int 1)
     if str(pipeline.get("version")) != "1":
         result["warnings"].append({
             "check": "version",
@@ -128,24 +165,69 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
             })
             continue
 
+        # Warn on unknown fields (likely typos)
+        for key in node.keys():
+            if key not in KNOWN_NODE_FIELDS:
+                result["warnings"].append({
+                    "check": "unknown_field",
+                    "message": f"{node_label}: 未知欄位 '{key}'（可能是拼字錯誤？）",
+                })
+
         is_prompt = _is_prompt_node(node)
 
         # Check required fields based on node type
-        if not node.get("id"):
+        node_id_raw = node.get("id")
+        if not node_id_raw:
             result["issues"].append({
                 "check": "node_field",
                 "message": f"{node_label}: 缺少欄位 'id'",
             })
+        elif not isinstance(node_id_raw, str):
+            result["issues"].append({
+                "check": "node_id_type",
+                "message": f"{node_label}: id 必須是字串，目前是 {type(node_id_raw).__name__}",
+            })
+        elif not ID_PATTERN.match(node_id_raw):
+            result["issues"].append({
+                "check": "node_id_format",
+                "message": f"{node_label}: id '{node_id_raw}' 格式不合（只能包含字母、數字、底線、連字號、點；不可有空白）",
+            })
+
         if not node.get("mode"):
             result["issues"].append({
                 "check": "node_field",
                 "message": f"{node_label}: 缺少欄位 'mode'",
             })
 
+        # Type-check optional string fields
+        for str_field in ("team", "team_path", "prompt", "prompt_file", "identity", "model"):
+            val = node.get(str_field)
+            if val is not None and not isinstance(val, str):
+                result["issues"].append({
+                    "check": "node_field_type",
+                    "message": f"{node_label}: '{str_field}' 必須是字串，目前是 {type(val).__name__}",
+                })
+
+        # Type-check rules (must be list of strings)
+        rules = node.get("rules")
+        if rules is not None:
+            if not isinstance(rules, list):
+                result["issues"].append({
+                    "check": "node_rules_type",
+                    "message": f"{node_label}: rules 必須是陣列，目前是 {type(rules).__name__}",
+                })
+            else:
+                for ri, rule in enumerate(rules):
+                    if not isinstance(rule, str):
+                        result["issues"].append({
+                            "check": "node_rules_item_type",
+                            "message": f"{node_label}: rules[{ri}] 必須是字串",
+                        })
+
         # Must have team OR prompt/prompt_file
         has_team = bool(node.get("team"))
-        has_prompt = bool(node.get("prompt", "").strip())
-        has_prompt_file = bool(node.get("prompt_file", "").strip())
+        has_prompt = bool(str(node.get("prompt", "")).strip())
+        has_prompt_file = bool(str(node.get("prompt_file", "")).strip())
         if not has_team and not has_prompt and not has_prompt_file:
             result["issues"].append({
                 "check": "node_source",
@@ -168,12 +250,15 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
             })
         seen_ids.add(node_id)
 
-        # Check mode
+        # Check mode (strict, case-sensitive)
         mode = node.get("mode", "")
-        if mode not in ("auto", "gate"):
+        if mode not in VALID_MODES:
+            hint = ""
+            if isinstance(mode, str) and mode.lower() in VALID_MODES:
+                hint = "（注意：mode 要小寫）"
             result["issues"].append({
                 "check": "node_mode",
-                "message": f"{node_label} ({node_id}): mode 必須是 'auto' 或 'gate'，目前是 '{mode}'",
+                "message": f"{node_label} ({node_id}): mode 必須是 'auto' 或 'gate'，目前是 '{mode}'{hint}",
             })
 
         if is_prompt:
@@ -186,16 +271,20 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                         "message": f"{node_label} ({node_id}): prompt_file 不存在: {pf_path}",
                     })
 
-            # Validate rules paths
-            for rule_path_str in node.get("rules", []):
-                rp = Path(rule_path_str)
-                if not rp.is_absolute():
-                    rp = (pipeline_path.parent / rp).resolve()
-                if not rp.exists():
-                    result["issues"].append({
-                        "check": "rule_file_exists",
-                        "message": f"{node_label} ({node_id}): rule 檔案不存在: {rp}",
-                    })
+            # Validate rules paths (skip if already flagged as wrong type)
+            rules_val = node.get("rules", [])
+            if isinstance(rules_val, list):
+                for rule_path_str in rules_val:
+                    if not isinstance(rule_path_str, str):
+                        continue
+                    rp = Path(rule_path_str)
+                    if not rp.is_absolute():
+                        rp = (pipeline_path.parent / rp).resolve()
+                    if not rp.exists():
+                        result["issues"].append({
+                            "check": "rule_file_exists",
+                            "message": f"{node_label} ({node_id}): rule 檔案不存在: {rp}",
+                        })
         else:
             # --- Team node validation ---
             team_slug = node.get("team", "")
@@ -235,7 +324,7 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                     "message": f"{node_label} ({node_id}): timeout 值無效 ({timeout})，將使用預設 1800",
                 })
 
-        # Check model (optional; free-form string — just warn on unknown)
+        # Check model (optional; free-form string, warn if not claude-*)
         model = node.get("model")
         if model is not None:
             if not isinstance(model, str) or not model.strip():
@@ -243,15 +332,22 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                     "check": "node_model",
                     "message": f"{node_label} ({node_id}): model 必須是非空字串",
                 })
+            elif not model.strip().startswith("claude-"):
+                result["warnings"].append({
+                    "check": "node_model_unknown",
+                    "message": f"{node_label} ({node_id}): model '{model}' 不像 Claude 模型 ID（預期以 'claude-' 開頭）",
+                })
 
         # Check effort (optional; must be one of the supported levels)
         effort = node.get("effort")
         if effort is not None:
-            valid_efforts = {"low", "medium", "high", "xhigh", "max"}
-            if not isinstance(effort, str) or effort not in valid_efforts:
+            if not isinstance(effort, str) or effort not in VALID_EFFORTS:
+                hint = ""
+                if isinstance(effort, str) and effort.lower() in VALID_EFFORTS:
+                    hint = "（注意：effort 要小寫）"
                 result["issues"].append({
                     "check": "node_effort",
-                    "message": f"{node_label} ({node_id}): effort 必須是 {sorted(valid_efforts)} 其中之一，目前是 '{effort}'",
+                    "message": f"{node_label} ({node_id}): effort 必須是 {sorted(VALID_EFFORTS)} 其中之一，目前是 '{effort}'{hint}",
                 })
 
     # Check {{node:<id>}} references in prompts

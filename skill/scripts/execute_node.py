@@ -8,6 +8,7 @@ updates status.json for live monitoring. Returns result when done.
 """
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -89,6 +90,13 @@ def execute_node(sandbox_path: str, node_index: int) -> dict:
         "--verbose",
         "--dangerously-skip-permissions",
     ]
+    if node.get("model"):
+        cmd += ["--model", str(node["model"])]
+
+    # Effort level is set via env var — more reliable than --effort flag
+    env = os.environ.copy()
+    if node.get("effort"):
+        env["CLAUDE_CODE_EFFORT_LEVEL"] = str(node["effort"])
 
     start_time = time.time()
     exit_code = 1
@@ -105,6 +113,7 @@ def execute_node(sandbox_path: str, node_index: int) -> dict:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env=env,
             )
 
             for line in process.stdout:

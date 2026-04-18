@@ -235,6 +235,25 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                     "message": f"{node_label} ({node_id}): timeout 值無效 ({timeout})，將使用預設 1800",
                 })
 
+        # Check model (optional; free-form string — just warn on unknown)
+        model = node.get("model")
+        if model is not None:
+            if not isinstance(model, str) or not model.strip():
+                result["issues"].append({
+                    "check": "node_model",
+                    "message": f"{node_label} ({node_id}): model 必須是非空字串",
+                })
+
+        # Check effort (optional; must be one of the supported levels)
+        effort = node.get("effort")
+        if effort is not None:
+            valid_efforts = {"low", "medium", "high", "xhigh", "max"}
+            if not isinstance(effort, str) or effort not in valid_efforts:
+                result["issues"].append({
+                    "check": "node_effort",
+                    "message": f"{node_label} ({node_id}): effort 必須是 {sorted(valid_efforts)} 其中之一，目前是 '{effort}'",
+                })
+
     # Check {{node:<id>}} references in prompts
     all_ids = [n.get("id", "") for n in nodes]
     id_set = set(filter(None, all_ids))

@@ -120,6 +120,8 @@ def setup_run(
             "mode": node["mode"],
             "prompt": node.get("prompt", ""),
             "prompt_file": node.get("prompt_file", ""),
+            "model": node.get("model", ""),
+            "effort": node.get("effort", ""),
             "timeout": node.get("timeout", utils.DEFAULT_TIMEOUT),
             "node_type": "team" if has_team else "prompt",
             "state": state,

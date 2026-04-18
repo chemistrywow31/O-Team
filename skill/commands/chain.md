@@ -40,10 +40,24 @@ Collect prompts step by step.
 2. AskUserQuestion: "Step 2 — next step (or 'done' to finish):"
 3. Repeat until user says "done"
 4. AskUserQuestion: "Name this chain? (Enter to skip)"
+5. AskUserQuestion: "Configure model / effort per step? (Options: skip / all-same / per-step)"
+   - **skip** → use Claude defaults for all steps
+   - **all-same** → ask ONCE for default model + effort, apply to every step
+     - AskUserQuestion: "Default model for all steps? (e.g. claude-opus-4-7 / claude-sonnet-4-6 / claude-haiku-4-5-20251001, Enter to skip)"
+     - AskUserQuestion: "Default effort for all steps? (low / medium / high / xhigh / max, Enter to skip)"
+   - **per-step** → for each step i, ask:
+     - AskUserQuestion: "Step {i}: model? (Enter to skip)"
+     - AskUserQuestion: "Step {i}: effort? (low/medium/high/xhigh/max, Enter to skip)"
 
-Build:
+Build the JSON arrays. Use empty strings for steps that should be skipped.
+`--models` and `--efforts` are optional — omit them entirely if the user chose "skip".
+
 ```bash
-PYTHONPATH=.claude/skills/ot python -m scripts.chain --prompts '<json-array>' --name "<name>" --json
+PYTHONPATH=.claude/skills/ot python -m scripts.chain \
+  --prompts '<prompts-json>' \
+  --models '<models-json-or-omit>' \
+  --efforts '<efforts-json-or-omit>' \
+  --name "<name>" --json
 ```
 
 → Go to Step 3.

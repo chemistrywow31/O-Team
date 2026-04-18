@@ -41,6 +41,8 @@ A pipeline supports two node types: **team nodes** and **prompt nodes**. Both ca
 | `prompt_file` | string | * | Path to external .md file (resolved relative to pipeline YAML) |
 | `identity` | string | NO | Written as CLAUDE.md in the node's office folder |
 | `rules` | array | NO | List of rule file paths to copy into the node's .claude/rules/ |
+| `model` | string | NO | Model ID passed to `claude --model` for this node only (e.g. `claude-haiku-4-5-20251001`) |
+| `effort` | string | NO | Thinking effort for this node only — one of `low` / `medium` / `high` / `xhigh` / `max`. Passed via `CLAUDE_CODE_EFFORT_LEVEL` env var, scoped to the node's subprocess. |
 | `timeout` | integer | NO | Timeout in seconds (default: 1800) |
 
 ## Examples

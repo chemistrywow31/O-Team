@@ -217,6 +217,8 @@ def build_chain_from_prompts(
     prompts: list[str],
     name: str = "chain",
     output_path: str | None = None,
+    models: list[str] | None = None,
+    efforts: list[str] | None = None,
 ) -> dict:
     """Build a pipeline from a list of prompt strings.
 
@@ -226,12 +228,16 @@ def build_chain_from_prompts(
         prompts: List of prompt texts (one per step)
         name: Pipeline name
         output_path: (optional) output pipeline YAML path
+        models: Optional per-step model IDs (empty string = skip)
+        efforts: Optional per-step effort levels (empty string = skip)
 
     Returns:
         dict with success status and pipeline info
     """
     if not prompts:
         return {"success": False, "error": "No prompts provided"}
+
+    valid_efforts = {"low", "medium", "high", "xhigh", "max", ""}
 
     nodes = []
     for i, prompt_text in enumerate(prompts):
@@ -240,12 +246,29 @@ def build_chain_from_prompts(
             continue
         step_name = _extract_heading(text) or f"step-{i+1}"
         is_last = (i == len(prompts) - 1)
-        nodes.append({
+        node = {
             "id": f"{i+1:02d}-{_slugify_name(step_name)}",
             "mode": "gate" if is_last else "auto",
             "prompt": text,
             "timeout": utils.DEFAULT_TIMEOUT,
-        })
+        }
+
+        if models and i < len(models):
+            m = (models[i] or "").strip()
+            if m:
+                node["model"] = m
+
+        if efforts and i < len(efforts):
+            e = (efforts[i] or "").strip()
+            if e:
+                if e not in valid_efforts:
+                    return {
+                        "success": False,
+                        "error": f"Step {i+1}: invalid effort '{e}' (must be low/medium/high/xhigh/max)",
+                    }
+                node["effort"] = e
+
+        nodes.append(node)
 
     if not nodes:
         return {"success": False, "error": "All prompts were empty"}
@@ -570,6 +593,14 @@ def main():
         help="JSON array of prompt strings (for interactive mode)",
     )
     parser.add_argument(
+        "--models", default=None,
+        help="JSON array of model IDs per step (parallel to --prompts; empty string = skip)",
+    )
+    parser.add_argument(
+        "--efforts", default=None,
+        help="JSON array of effort levels per step (low/medium/high/xhigh/max; empty = skip)",
+    )
+    parser.add_argument(
         "--name", default="chain",
         help="Pipeline name (used with --prompts)",
     )
@@ -586,10 +617,15 @@ def main():
         import json as _json
         try:
             prompts = _json.loads(args.prompts)
+            models = _json.loads(args.models) if args.models else None
+            efforts = _json.loads(args.efforts) if args.efforts else None
         except _json.JSONDecodeError as e:
             result = {"success": False, "error": f"Invalid JSON: {e}"}
         else:
-            result = build_chain_from_prompts(prompts, args.name, args.output)
+            result = build_chain_from_prompts(
+                prompts, args.name, args.output,
+                models=models, efforts=efforts,
+            )
     elif args.source:
         result = build_chain(args.source, args.output)
     else:

@@ -252,7 +252,6 @@ function showBanner() {
     console.log("");
     for (const line of staticFallback) console.log(line);
     console.log("");
-    console.log("  Multi-team AI Agent Pipeline Orchestrator");
     console.log("  ─────────────────────────────────────────");
     console.log("");
     return;
@@ -329,7 +328,7 @@ function showBanner() {
 
   // Phase 3: subtitle drops in below the logo
   console.log("");
-  process.stdout.write(`  ${paintRow("Agent Office — Multi-team AI Pipeline")}\n`);
+  process.stdout.write(`  ${paintRow("Agent Office")}\n`);
   console.log(`  ${DIM}─────────────────────────────────────────${RESET}`);
   console.log("");
 

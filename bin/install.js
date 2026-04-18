@@ -326,10 +326,12 @@ function showBanner() {
 
   sleepSync(200);
 
-  // Phase 3: subtitle drops in below the logo
+  // Phase 3: subtitle drops in below the logo — centred under the logo
+  const subtitle = "Agent Office";
+  const subtitlePad = " ".repeat(Math.max(0, Math.floor((width - subtitle.length) / 2)));
   console.log("");
-  process.stdout.write(`  ${paintRow("Agent Office")}\n`);
-  console.log(`  ${DIM}─────────────────────────────────────────${RESET}`);
+  process.stdout.write(`${subtitlePad}${paintRow(subtitle)}\n`);
+  console.log(`${DIM}${"─".repeat(width)}${RESET}`);
   console.log("");
 
   // Restore cursor

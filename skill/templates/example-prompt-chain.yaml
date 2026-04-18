@@ -2,24 +2,48 @@ version: "1"
 name: Example Prompt Chain
 slug: example-prompt-chain
 objective: |
-  A prompt-only pipeline (no teams needed) that demonstrates every feature
-  O-Team supports: inline prompts, external prompt files, cross-node output
-  references via {{node:<id>}}, per-node model and effort selection, shared
-  workspace files, identity, rules, and mixed auto/gate modes.
-
-  Use case: take a raw article or research note, extract structured facts,
-  analyse them, produce a critique, then synthesise a final report.
+  A 4-step prompt chain that demonstrates every feature O-Team supports.
+  Use case: take a raw article, extract facts, analyse them, critique the
+  analysis, then synthesise a decision-ready brief.
 
 created_at: "2026-04-18T00:00:00+08:00"
 
+# =============================================================================
+# HOW TO REFERENCE A PRIOR STEP'S OUTPUT
+# =============================================================================
+#
+#   Inside any node's `prompt` text, write:
+#
+#       {{node:<id>}}
+#
+#   …where <id> is the `id:` field of an EARLIER node. At runtime the tag is
+#   replaced with:
+#
+#       <output id="<id>">
+#       ...the full content of that node's output.md...
+#       </output>
+#
+#   Rules:
+#     - The <id> must exactly match an earlier node's `id:` (validator
+#       warns if it doesn't, or if it points to a later node).
+#     - You can reference MULTIPLE prior nodes in the same prompt.
+#     - By default every node already receives the IMMEDIATELY preceding
+#       node's output as input.md — so you only need {{node:<id>}} when you
+#       want to pull in outputs from steps further back, or multiple steps
+#       at once.
+#     - If the referenced output is huge, prefer reading it from the
+#       workspace: every completed node's output.md is auto-copied to
+#       workspace/<id>.md, and your prompt can just say
+#       "read workspace/01-extract.md".
+#
+# =============================================================================
+
 nodes:
-  # -------------------------------------------------------------------------
-  # Node 1 — Extract (Haiku, low effort)
-  #
-  # Simple extraction task. Haiku is ~10x cheaper than Opus and plenty for
-  # structured parsing. Low effort = no extended thinking.
-  # -------------------------------------------------------------------------
-  - id: 01-extract
+
+  # ---------------------------------------------------------------------------
+  # Node 1 — Extract (Haiku, cheap + fast)
+  # ---------------------------------------------------------------------------
+  - id: 01-extract                           # ← other nodes reference this id
     mode: auto
     model: claude-haiku-4-5-20251001
     effort: low
@@ -27,22 +51,21 @@ nodes:
     prompt: |
       # Extract structured facts
 
-      You will receive a raw article or research note. Extract:
+      Read the raw article provided as input and extract:
+        - Key claims (numbered)
+        - Named entities (people, companies, products)
+        - Quantitative data (figures, dates, percentages)
+        - Open questions
 
-      - Key claims (one per line, numbered)
-      - Named entities (people, companies, products)
-      - Quantitative data (figures, dates, percentages)
-      - Open questions or gaps worth investigating
+      Output as structured markdown.
 
-      Output as structured markdown with the headings above.
-
-  # -------------------------------------------------------------------------
-  # Node 2 — Analyse (Sonnet, medium effort)
+  # ---------------------------------------------------------------------------
+  # Node 2 — Analyse (Sonnet, balanced)
   #
-  # Reasoning task. Sonnet balances cost and capability. Medium effort
-  # enables moderate extended thinking.
-  # -------------------------------------------------------------------------
-  - id: 02-analyse
+  # This node does NOT need {{node:...}} because its input is already the
+  # output of the previous step (Node 1), delivered automatically.
+  # ---------------------------------------------------------------------------
+  - id: 02-analyse                           # ← other nodes reference this id
     mode: auto
     model: claude-sonnet-4-6
     effort: medium
@@ -50,90 +73,89 @@ nodes:
     prompt: |
       # Analyse the extracted facts
 
-      Read the facts from the previous step and:
-      1. Identify the 3 most important claims
-      2. Assess the strength of evidence for each
-      3. Note any contradictions or tensions between claims
-      4. Surface assumptions the author is making
+      From the facts provided as input:
+        1. Identify the 3 most important claims
+        2. Assess evidence strength for each
+        3. Note contradictions
+        4. Surface author's assumptions
 
-      Be specific — cite the exact claim you're analysing.
-
-  # -------------------------------------------------------------------------
-  # Node 3 — Critique (Opus, high effort, references Node 1 directly)
+  # ---------------------------------------------------------------------------
+  # Node 3 — Critique (Opus, references Node 1 explicitly)
   #
-  # Demonstrates {{node:<id>}} cross-reference: this node needs BOTH the
-  # original facts (node 1) AND the analysis (node 2, which is the default
-  # previous-step input). The tag expands at prompt-assembly time into:
-  #   <output id="01-extract">...original extract content...</output>
-  # -------------------------------------------------------------------------
+  # Node 3's default input is Node 2's analysis (previous step). But it ALSO
+  # needs the original extracted facts (Node 1) to cross-check. So we pull
+  # Node 1 in with {{node:01-extract}}.
+  # ---------------------------------------------------------------------------
   - id: 03-critique
     mode: auto
     model: claude-opus-4-7
     effort: high
     timeout: 1800
     identity: |
-      You are a senior research critic. You reward precision over breadth,
-      push back on unsupported leaps, and always separate "what was shown"
-      from "what was claimed."
+      You are a senior research critic. You reward precision over breadth
+      and separate "what was shown" from "what was claimed."
     prompt: |
       # Critical review
 
-      Cross-check the analysis against the original facts to catch any
-      mis-readings, over-reach, or cherry-picking.
+      You have been given the analysis as your primary input. Cross-check it
+      against the original facts below to catch over-reach or cherry-picking.
 
-      Original extracted facts (for verification):
-
+      ── Original facts from Node 1 ──────────────────────────
       {{node:01-extract}}
+      ────────────────────────────────────────────────────────
 
-      For the analysis you have received as input, produce:
-      - Valid points (agree with evidence)
-      - Weak points (claimed but under-supported)
-      - Missing angles (the analyst should have covered but didn't)
+      Produce:
+        - Valid points (supported by the facts)
+        - Weak points (claimed but under-supported)
+        - Missing angles
 
-  # -------------------------------------------------------------------------
-  # Node 4 — Synthesise (Opus, max effort, GATE for human review)
+  # ---------------------------------------------------------------------------
+  # Node 4 — Synthesise (Opus + max effort, GATE, references EVERY prior node)
   #
-  # Final node — pauses for review before completing. Max effort unlocks
-  # the deepest extended thinking. References ALL prior outputs explicitly
-  # so the model has the full context in one prompt instead of only the
-  # immediately preceding step's output.
-  # -------------------------------------------------------------------------
+  # The final step needs ALL three earlier outputs in one shot to write a
+  # coherent brief — so it references Nodes 1, 2, and 3 explicitly. `gate`
+  # mode pauses for your approve / edit / reject review before finishing.
+  # ---------------------------------------------------------------------------
   - id: 04-synthesise
     mode: gate
     model: claude-opus-4-7
     effort: max
     timeout: 2400
-    prompt_file: ./prompts/04-synthesise.md   # example of external prompt
-    # rules: shared style / writing guidelines copied into the node's
-    # .claude/rules/ folder. Paths are resolved relative to this YAML.
     rules:
-      - ./rules/writing-style.md
+      - ./rules/writing-style.md             # copied into node's .claude/rules/
+    prompt: |
+      # Final synthesis
 
-# -----------------------------------------------------------------------------
-# Features demonstrated in this example
-# -----------------------------------------------------------------------------
+      Produce a decision-ready brief, under 500 words. Cite which step each
+      claim comes from.
+
+      ── Extracted facts (Node 1) ────────────────────────────
+      {{node:01-extract}}
+
+      ── Analysis (Node 2) ───────────────────────────────────
+      {{node:02-analyse}}
+
+      ── Critique (Node 3) ───────────────────────────────────
+      {{node:03-critique}}
+      ────────────────────────────────────────────────────────
+
+      Structure:
+        1. Bottom line (1 paragraph)
+        2. Key findings (3–5 bullets, each citing a step)
+        3. Open questions
+        4. One concrete next step
+
+      If the critique flagged a claim as weak, either drop it or mark it
+      "unverified" — do not repeat weak claims as fact.
+
+# =============================================================================
+# Features demonstrated
+#   - Prompt-only nodes (no team field needed anywhere)
+#   - Per-node model:  Haiku → Sonnet → Opus (cost-optimised)
+#   - Per-node effort: low → medium → high → max (thinking-optimised)
+#   - {{node:<id>}} references: Node 3 pulls in Node 1; Node 4 pulls in 1+2+3
+#   - mode auto + gate mixed
+#   - identity on Node 3, rules on Node 4, timeout on every node
 #
-# - Prompt-only nodes (no team field needed)
-# - Inline `prompt:` and external `prompt_file:`
-# - Cross-node output reference via {{node:<id>}} — replaces the tag with
-#   <output id="<id>">...content of node's output.md...</output> at runtime.
-#   If the referenced node has not run yet, the tag becomes
-#   <output id="<id>" status="not_yet_available"/>
-# - Workspace: every completed node's output.md is auto-copied to
-#   workspace/<node_id>.md so a downstream node can also instruct the agent
-#   to "read workspace/01-extract.md" if the output is too large to inline.
-# - `model:` per node — route cheap tasks to Haiku, reasoning to Sonnet,
-#   synthesis to Opus. Each node spawns its own subprocess.
-# - `effort:` per node — low / medium / high / xhigh / max. Delivered via
-#   the CLAUDE_CODE_EFFORT_LEVEL env var scoped to that subprocess, so
-#   different nodes in the same run can use different effort levels and
-#   parallel runs do not race.
-# - `identity:` — written as CLAUDE.md in the node's office folder.
-# - `rules:` — paths to shared markdown files, copied into the node's
-#   .claude/rules/ and auto-included in the assembled prompt.
-# - `mode: auto | gate` — auto runs hands-free, gate pauses for your
-#   review with approve/edit/reject/skip.
-# - `timeout:` — seconds before the node's subprocess is terminated
-#   (default 1800).
-#
-# Run this pipeline with:   /ot:run example-prompt-chain
+# Run with:  /ot:run example-prompt-chain
+# =============================================================================

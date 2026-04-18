@@ -102,13 +102,13 @@ def finalize_run(
     target_dir = archive_dir / date_partition
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    new_folder = f"{sanitized}-{run_id}"
-    new_path = target_dir / new_folder
-
-    if new_path.exists():
-        # Avoid collision
-        new_folder = f"{sanitized}-{run_id}-2"
-        new_path = target_dir / new_folder
+    base_folder = f"{sanitized}-{run_id}"
+    new_path = target_dir / base_folder
+    suffix = 2
+    while new_path.exists():
+        new_path = target_dir / f"{base_folder}-{suffix}"
+        suffix += 1
+    new_folder = new_path.name
 
     try:
         sandbox.rename(new_path)

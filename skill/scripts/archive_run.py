@@ -52,9 +52,10 @@ def archive_run(sandbox_path: str, run_name: str) -> dict:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     new_path = target_dir / new_folder_name
-
-    if new_path.exists():
-        return {"success": False, "error": f"Archive path already exists: {new_path}"}
+    suffix = 2
+    while new_path.exists():
+        new_path = target_dir / f"{new_folder_name}-{suffix}"
+        suffix += 1
 
     sandbox.rename(new_path)
 

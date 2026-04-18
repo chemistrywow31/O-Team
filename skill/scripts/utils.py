@@ -328,10 +328,18 @@ def setup_prompt_node(node: dict, office: Path, pipeline_path: Path) -> None:
     """
     import shutil
 
-    # Write identity as CLAUDE.md
+    # Write identity as CLAUDE.md. Always create the file (even if empty stub)
+    # so claude -p does not walk up and pick up unrelated project CLAUDE.md.
     identity = node.get("identity", "").strip()
     if identity:
         write_text(office / "CLAUDE.md", identity)
+    else:
+        write_text(
+            office / "CLAUDE.md",
+            "# O-Team Prompt Node\n\n"
+            "Follow the instructions provided via the prompt exactly. "
+            "Do not look beyond the provided context.\n",
+        )
 
     # Copy custom rules
     rules = node.get("rules", [])

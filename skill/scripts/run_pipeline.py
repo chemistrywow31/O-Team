@@ -509,7 +509,7 @@ def _prompt_archive_run(run_state: dict, sandbox: Path, project_dir: Path) -> Pa
         return sandbox
 
     # Sanitize: keep alphanumeric, dash, underscore, CJK characters
-    run_name = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', answer)
+    run_name = re.sub(r'[^\w\u4e00-\u9fff\-]+', '_', answer).strip('_-')
     if not run_name:
         return sandbox
 

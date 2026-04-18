@@ -37,7 +37,7 @@ def archive_run(sandbox_path: str, run_name: str) -> dict:
         return {"success": False, "error": f"Run '{meta['run_id']}' is already archived"}
 
     # Sanitize: keep alphanumeric, dash, underscore, CJK characters
-    sanitized = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', run_name)
+    sanitized = re.sub(r'[^\w\u4e00-\u9fff\-]+', '_', run_name).strip('_-')
     if not sanitized:
         return {"success": False, "error": "Run name is empty after sanitization"}
 

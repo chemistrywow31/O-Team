@@ -90,8 +90,8 @@ def finalize_run(
     if not archive_name:
         return result
 
-    # Sanitize name
-    sanitized = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', archive_name)
+    # Sanitize name — collapse invalid runs to a single '_', strip edges
+    sanitized = re.sub(r'[^\w\u4e00-\u9fff\-]+', '_', archive_name).strip('_-')
     if not sanitized:
         return result
 

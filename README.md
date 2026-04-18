@@ -1,13 +1,8 @@
-# O-Team CLI
+<p align="center">
+  <img src="oteam.png" alt="O-Team" width="420">
+</p>
 
-```
-   ___        _____
-  / _ \      |_   _|__  __ _ _ __ ___
- | | | |_____  | |/ _ \/ _` | '_ ` _ \
- | |_| |_____| | |  __/ (_| | | | | | |
-  \___/        |_|\___|\__,_|_| |_| |_|
-               Agent Office
-```
+# O-Team CLI
 
 Chain multiple AI agent teams into pipelines. Each team works independently, passes results to the next, and you review at checkpoints.
 
@@ -39,6 +34,7 @@ O-Team is **prompt chaining, evolved**.
 Traditional prompt chaining passes output from one prompt to the next within a single session. It works for simple tasks, but breaks down at scale — context degrades, errors compound, and you can't intervene mid-chain.
 
 O-Team takes each link in the chain and gives it:
+
 - **Its own process** — a separate `claude` instance with a fresh context window
 - **Its own identity** — a team-specific `CLAUDE.md` with specialized expertise
 - **Human checkpoints** — gate nodes where you review, edit, or reject before continuing
@@ -69,28 +65,29 @@ The result: multi-step AI workflows that stay sharp at every stage, with human o
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `/ot:demo` | Guided tutorial — start here |
-| `/ot:chain [path]` | Build a pipeline from a prompt chain (no teams required) |
-| `/ot:reg` | List registered teams |
-| `/ot:reg add <path>` | Register team(s) from path |
-| `/ot:reg rm <slug>` | Remove a team |
-| `/ot:build` | Build a team-based pipeline interactively |
-| `/ot:run [name]` | Run a pipeline |
-| `/ot:pipe` | List saved pipelines |
-| `/ot:pipe show <name>` | Show pipeline details |
-| `/ot:pipe rm <name>` | Delete a pipeline |
-| `/ot:status` | Check running pipeline status |
-| `/ot:runs` | View run history |
-| `/ot:clean` | Clean up old runs |
-| `/ot:config` | Settings (statusline, language) |
+| Command                | Description                                              |
+| ---------------------- | -------------------------------------------------------- |
+| `/ot:demo`             | Guided tutorial — start here                             |
+| `/ot:chain [path]`     | Build a pipeline from a prompt chain (no teams required) |
+| `/ot:reg`              | List registered teams                                    |
+| `/ot:reg add <path>`   | Register team(s) from path                               |
+| `/ot:reg rm <slug>`    | Remove a team                                            |
+| `/ot:build`            | Build a team-based pipeline interactively                |
+| `/ot:run [name]`       | Run a pipeline                                           |
+| `/ot:pipe`             | List saved pipelines                                     |
+| `/ot:pipe show <name>` | Show pipeline details                                    |
+| `/ot:pipe rm <name>`   | Delete a pipeline                                        |
+| `/ot:status`           | Check running pipeline status                            |
+| `/ot:runs`             | View run history                                         |
+| `/ot:clean`            | Clean up old runs                                        |
+| `/ot:config`           | Settings (statusline, language)                          |
 
 <details>
 <summary>Long aliases (backward compatible)</summary>
 
 All commands also work with the `o-team:` prefix:
 `/o-team:registry`, `/o-team:build`, `/o-team:run`, `/o-team:pipeline`, `/o-team:status`, `/o-team:runs`, `/o-team:clean`, `/o-team:config`
+
 </details>
 
 ### How It Works
@@ -105,14 +102,14 @@ All commands also work with the `o-team:` prefix:
 
 Every node can independently set:
 
-| Field | Purpose |
-|---|---|
-| `model` | Route cheap tasks to Haiku, reasoning to Sonnet, synthesis to Opus |
-| `effort` | Thinking level: `low` / `medium` / `high` / `xhigh` / `max`. Delivered via a per-subprocess env var — parallel runs don't race. |
-| `mode` | `auto` (hands-free) or `gate` (pause for approve / edit / reject / skip) |
-| `identity` | Written as CLAUDE.md in the node's office folder |
-| `rules` | List of markdown files copied into the node's `.claude/rules/` |
-| `timeout` | Subprocess timeout (seconds) |
+| Field      | Purpose                                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `model`    | Route cheap tasks to Haiku, reasoning to Sonnet, synthesis to Opus                                                              |
+| `effort`   | Thinking level: `low` / `medium` / `high` / `xhigh` / `max`. Delivered via a per-subprocess env var — parallel runs don't race. |
+| `mode`     | `auto` (hands-free) or `gate` (pause for approve / edit / reject / skip)                                                        |
+| `identity` | Written as CLAUDE.md in the node's office folder                                                                                |
+| `rules`    | List of markdown files copied into the node's `.claude/rules/`                                                                  |
+| `timeout`  | Subprocess timeout (seconds)                                                                                                    |
 
 ### Cross-node references
 
@@ -252,6 +249,7 @@ O-Team 是 **Prompt Chaining 的進化版**。
 傳統的 prompt chaining 在同一個 session 中把前一個 prompt 的輸出傳給下一個。簡單任務沒問題，但規模一大就會崩 — 上下文退化、錯誤累積、無法中途介入。
 
 O-Team 把 chain 中的每一環獨立出來，賦予：
+
 - **獨立程序** — 每個節點是一個全新的 `claude` 實例，上下文從零開始
 - **專屬身份** — 每個團隊有自己的 `CLAUDE.md`，定義專業領域
 - **人工檢查點** — gate 節點讓你審核、修改、退回再繼續
@@ -282,28 +280,29 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 
 ### 指令一覽
 
-| 指令 | 說明 |
-|------|------|
-| `/ot:demo` | 教學導覽 — 從這裡開始 |
-| `/ot:chain [path]` | 從 prompt chain 建立 pipeline（不需團隊） |
-| `/ot:reg` | 列出已註冊的團隊 |
-| `/ot:reg add <path>` | 從路徑註冊團隊 |
-| `/ot:reg rm <slug>` | 移除團隊 |
-| `/ot:build` | 互動式建立團隊 pipeline |
-| `/ot:run [name]` | 執行 pipeline |
-| `/ot:pipe` | 列出已存的 pipeline |
-| `/ot:pipe show <name>` | 顯示 pipeline 詳情 |
-| `/ot:pipe rm <name>` | 刪除 pipeline |
-| `/ot:status` | 查看執行中的狀態 |
-| `/ot:runs` | 查看執行歷史 |
-| `/ot:clean` | 清理舊的執行紀錄 |
-| `/ot:config` | 設定（狀態列、語系） |
+| 指令                   | 說明                                      |
+| ---------------------- | ----------------------------------------- |
+| `/ot:demo`             | 教學導覽 — 從這裡開始                     |
+| `/ot:chain [path]`     | 從 prompt chain 建立 pipeline（不需團隊） |
+| `/ot:reg`              | 列出已註冊的團隊                          |
+| `/ot:reg add <path>`   | 從路徑註冊團隊                            |
+| `/ot:reg rm <slug>`    | 移除團隊                                  |
+| `/ot:build`            | 互動式建立團隊 pipeline                   |
+| `/ot:run [name]`       | 執行 pipeline                             |
+| `/ot:pipe`             | 列出已存的 pipeline                       |
+| `/ot:pipe show <name>` | 顯示 pipeline 詳情                        |
+| `/ot:pipe rm <name>`   | 刪除 pipeline                             |
+| `/ot:status`           | 查看執行中的狀態                          |
+| `/ot:runs`             | 查看執行歷史                              |
+| `/ot:clean`            | 清理舊的執行紀錄                          |
+| `/ot:config`           | 設定（狀態列、語系）                      |
 
 <details>
 <summary>完整指令名稱（向後相容）</summary>
 
 所有指令也支援 `o-team:` 前綴：
 `/o-team:registry`、`/o-team:build`、`/o-team:run`、`/o-team:pipeline`、`/o-team:status`、`/o-team:runs`、`/o-team:clean`、`/o-team:config`
+
 </details>
 
 ### 運作方式
@@ -316,14 +315,14 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 
 ### 每個節點都可獨立設定
 
-| 欄位 | 用途 |
-|---|---|
-| `model` | 便宜任務用 Haiku、推理用 Sonnet、最終統合用 Opus |
-| `effort` | 思考強度：`low` / `medium` / `high` / `xhigh` / `max`。透過 subprocess 獨立的環境變數傳遞，多 chain 平行不互相干擾 |
-| `mode` | `auto`（全自動）或 `gate`（暫停審核：核准/編輯/退回/跳過） |
-| `identity` | 寫入節點辦公室的 CLAUDE.md |
-| `rules` | Markdown 檔案清單，複製到節點的 `.claude/rules/` |
-| `timeout` | Subprocess 逾時秒數 |
+| 欄位       | 用途                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| `model`    | 便宜任務用 Haiku、推理用 Sonnet、最終統合用 Opus                                                                   |
+| `effort`   | 思考強度：`low` / `medium` / `high` / `xhigh` / `max`。透過 subprocess 獨立的環境變數傳遞，多 chain 平行不互相干擾 |
+| `mode`     | `auto`（全自動）或 `gate`（暫停審核：核准/編輯/退回/跳過）                                                         |
+| `identity` | 寫入節點辦公室的 CLAUDE.md                                                                                         |
+| `rules`    | Markdown 檔案清單，複製到節點的 `.claude/rules/`                                                                   |
+| `timeout`  | Subprocess 逾時秒數                                                                                                |
 
 ### 跨節點引用
 

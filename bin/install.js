@@ -147,37 +147,89 @@ function _updateSettingsStatusline(settingsPath, newCommand) {
 // Banner animation
 // ---------------------------------------------------------------------------
 
-const BANNER_LINES = [
-  "     ___        _____",
-  "    / _ \\      |_   _|__  __ _ _ __ ___",
-  "   | | | |_____  | |/ _ \\/ _` | '_ ` _ \\",
-  "   | |_| |_____| | |  __/ (_| | | | | | |",
-  "    \\___/        |_|\\___|\\__,_|_| |_| |_|",
-  "                  Agent Office",
-];
-// Cyan → blue → magenta gradient, mirrored, so the top and bottom feel
-// symmetric when the eye scans the block.
-const BANNER_COLORS = [
-  "\x1b[96m", "\x1b[94m", "\x1b[95m",
-  "\x1b[95m", "\x1b[94m", "\x1b[96m",
-];
+// Solid-block font — 5 rows tall, each letter 5 columns wide.
+// `█` = stroke, space = empty. No thin-line characters — the strokes are
+// filled so the gradient has dense pixels to colour.
+const FONT = {
+  O: ["█████", "█   █", "█   █", "█   █", "█████"],
+  "-": ["     ", "     ", " ███ ", "     ", "     "],
+  T: ["█████", "  █  ", "  █  ", "  █  ", "  █  "],
+  E: ["█████", "█    ", "████ ", "█    ", "█████"],
+  A: [" ███ ", "█   █", "█████", "█   █", "█   █"],
+  M: ["█   █", "██ ██", "█ █ █", "█   █", "█   █"],
+};
+
+function buildLogo(text) {
+  const rows = ["", "", "", "", ""];
+  for (let i = 0; i < text.length; i++) {
+    const glyph = FONT[text[i].toUpperCase()];
+    if (!glyph) continue;
+    for (let r = 0; r < 5; r++) {
+      rows[r] += glyph[r];
+      if (i < text.length - 1) rows[r] += " ";
+    }
+  }
+  return rows;
+}
+
+// 256-colour horizontal gradient: cyan → light blue → purple → magenta → pink
+const PALETTE = [51, 45, 39, 33, 75, 99, 135, 165, 201, 207, 213];
 
 function sleepSync(ms) {
   const end = Date.now() + ms;
-  while (Date.now() < end) { /* busy wait — < 1s total across all calls */ }
+  while (Date.now() < end) { /* busy wait — short total across calls */ }
+}
+
+function colorOf(col, total) {
+  const pct = total > 1 ? col / (total - 1) : 0;
+  const idx = Math.min(PALETTE.length - 1, Math.floor(pct * PALETTE.length));
+  return `\x1b[38;5;${PALETTE[idx]}m`;
+}
+
+function paintRow(row, highlightCol = -1) {
+  let out = "";
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (i === highlightCol) {
+      out += `\x1b[97m\x1b[1m${ch}`; // bright white bold
+    } else {
+      out += `${colorOf(i, row.length)}${ch}`;
+    }
+  }
+  return out + "\x1b[0m";
+}
+
+function redrawFrame(rows, highlightCol) {
+  // Cursor is currently just below the last row. Move up, rewrite each row,
+  // then come back down so subsequent writes land in the right place.
+  for (let r = 0; r < rows.length; r++) {
+    const up = rows.length - r;
+    process.stdout.write(`\x1b[${up}A\r\x1b[2K${paintRow(rows[r], highlightCol)}`);
+    process.stdout.write(`\x1b[${up}B\r`);
+  }
 }
 
 function showBanner() {
   const RESET = "\x1b[0m";
-  const HIGHLIGHT = "\x1b[97m\x1b[1m"; // bright white bold for sweep flash
   const DIM = "\x1b[2m";
+
+  const logo = buildLogo("O-TEAM");
+  const width = logo[0].length;
+  const staticFallback = [
+    "     ___        _____",
+    "    / _ \\      |_   _|__  __ _ _ __ ___",
+    "   | | | |_____  | |/ _ \\/ _` | '_ ` _ \\",
+    "   | |_| |_____| | |  __/ (_| | | | | | |",
+    "    \\___/        |_|\\___|\\__,_|_| |_| |_|",
+    "                  Agent Office",
+  ];
 
   const animate =
     process.stdout.isTTY && !process.env.NO_COLOR && !process.env.CI;
 
   if (!animate) {
     console.log("");
-    for (const line of BANNER_LINES) console.log(line);
+    for (const line of staticFallback) console.log(line);
     console.log("");
     console.log("  Multi-team AI Agent Pipeline Orchestrator");
     console.log("  ─────────────────────────────────────────");
@@ -185,33 +237,39 @@ function showBanner() {
     return;
   }
 
+  // Hide cursor during animation
+  process.stdout.write("\x1b[?25l");
+
   console.log("");
 
-  // Phase 1: reveal — drop each line in sequence, coloured per the gradient
-  for (let i = 0; i < BANNER_LINES.length; i++) {
-    process.stdout.write(`${BANNER_COLORS[i]}${BANNER_LINES[i]}${RESET}\n`);
-    sleepSync(55);
+  // Phase 1: reveal — each row appears, already painted with horizontal gradient
+  for (let r = 0; r < logo.length; r++) {
+    process.stdout.write(`${paintRow(logo[r])}\n`);
+    sleepSync(140);
   }
 
-  // Phase 2: scan sweep — a bright-white highlight rolls top-to-bottom and
-  // settles back to the gradient colour, giving a gentle "power on" feel.
-  for (let i = 0; i < BANNER_LINES.length; i++) {
-    const up = BANNER_LINES.length - i;
-    process.stdout.write(
-      `\x1b[${up}A\r\x1b[2K${HIGHLIGHT}${BANNER_LINES[i]}${RESET}`,
-    );
-    sleepSync(22);
-    process.stdout.write(
-      `\r\x1b[2K${BANNER_COLORS[i]}${BANNER_LINES[i]}${RESET}`,
-    );
-    process.stdout.write(`\x1b[${up}B\r`);
-  }
+  // Brief pause so the static gradient registers before the sweep starts
+  sleepSync(200);
 
-  sleepSync(120);
+  // Phase 2: shimmer sweep left → right — a bright column travels across
+  // all rows; column returns to gradient colour after the beam passes.
+  for (let c = 0; c < width; c++) {
+    redrawFrame(logo, c);
+    sleepSync(45);
+  }
+  // One final redraw with no highlight, so we end on clean gradient
+  redrawFrame(logo, -1);
+
+  sleepSync(300);
+
+  // Phase 3: subtitle drops in below the logo
   console.log("");
-  console.log(`  ${DIM}Multi-team AI Agent Pipeline Orchestrator${RESET}`);
+  process.stdout.write(`  ${paintRow("Agent Office — Multi-team AI Pipeline")}\n`);
   console.log(`  ${DIM}─────────────────────────────────────────${RESET}`);
   console.log("");
+
+  // Restore cursor
+  process.stdout.write("\x1b[?25h");
 }
 
 // ---------------------------------------------------------------------------

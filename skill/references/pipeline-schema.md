@@ -160,6 +160,42 @@ nodes:
       Apply AP style guidelines.
 ```
 
+## Referencing Other Nodes' Outputs
+
+By default, each node only receives the **previous** node's output as its
+input. To reference other nodes' outputs, use one of:
+
+### 1. `{{node:<id>}}` tags inside a prompt (explicit)
+
+```yaml
+- id: 03-report
+  mode: gate
+  prompt: |
+    根據以下兩份資料撰寫最終報告：
+
+    研究資料：
+    {{node:01-research}}
+
+    分析結論：
+    {{node:02-analyze}}
+```
+
+At prompt-assembly time, each tag is replaced with the referenced node's
+`output.md` content wrapped in `<output id="<id>">...</output>`. If the
+node has not executed yet, the tag becomes `<output id="<id>"
+status="not_yet_available"/>`.
+
+Validation warns if the referenced id does not exist or refers to a node
+that runs at the same position or later.
+
+### 2. Workspace files (implicit)
+
+Every completed node's `output.md` is automatically copied to
+`workspace/<node_id>.md`. Later prompts can instruct the agent to read
+these files explicitly, e.g. *"Read `workspace/01-research.md` for the
+raw findings."* This is useful when the output is large and you do not
+want to inline it into the prompt.
+
 ## Validation Rules
 
 - `version` must be `"1"`

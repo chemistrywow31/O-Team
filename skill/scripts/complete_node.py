@@ -48,15 +48,22 @@ def complete_node(
     # Update state
     node["state"] = "SKIPPED" if skip else "COMPLETE"
 
+    # Publish output to shared workspace so later nodes can reference it
+    # either via {{node:<id>}} tags or by reading workspace/<id>.md directly.
+    src_output = sandbox / node["id"] / "output.md"
+    if not skip and src_output.exists():
+        workspace = sandbox / "workspace"
+        workspace.mkdir(exist_ok=True)
+        shutil.copy2(src_output, workspace / f"{node['id']}.md")
+
     # Transfer output to next node
     next_node_info = None
     if node_index + 1 < len(meta["nodes"]):
         next_node = meta["nodes"][node_index + 1]
-        src = sandbox / node["id"] / "output.md"
         dst = sandbox / next_node["id"] / "input.md"
 
-        if not skip and src.exists():
-            shutil.copy2(src, dst)
+        if not skip and src_output.exists():
+            shutil.copy2(src_output, dst)
         else:
             utils.write_text(dst, "")
 

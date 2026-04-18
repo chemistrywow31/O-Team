@@ -4,9 +4,37 @@ Extracts the common prompt-building logic used by both run_pipeline.py
 and execute_node.py so each module delegates here instead of duplicating.
 """
 
+import re
 from pathlib import Path
 
 from . import utils
+
+
+NODE_REF_PATTERN = re.compile(r"\{\{\s*node\s*:\s*([a-zA-Z0-9_\-.]+)\s*\}\}")
+
+
+def expand_node_refs(text: str, sandbox: Path) -> str:
+    """Expand {{node:<id>}} tags with the referenced node's output.md content.
+
+    Replaces each tag with <output id="<id>">...</output>. If the referenced
+    node has not produced output yet, inserts a placeholder tag so the LLM
+    can see the reference but knows the data is missing.
+    """
+    if not text or "{{" not in text:
+        return text
+
+    def _replace(match: re.Match) -> str:
+        node_id = match.group(1)
+        output_file = sandbox / node_id / "output.md"
+        if output_file.exists():
+            try:
+                content = output_file.read_text(encoding="utf-8").strip()
+                return f'<output id="{node_id}">\n{content}\n</output>'
+            except Exception:
+                return f'<output id="{node_id}" status="read_error"/>'
+        return f'<output id="{node_id}" status="not_yet_available"/>'
+
+    return NODE_REF_PATTERN.sub(_replace, text)
 
 
 def list_workspace_files(workspace: Path) -> list[str]:
@@ -177,6 +205,7 @@ def assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
     # Node-specific instructions
     prompt_text = resolve_prompt_text(node)
     if prompt_text:
+        prompt_text = expand_node_refs(prompt_text, sandbox)
         parts.append("## Instructions")
         parts.append("")
         parts.append("<node_instructions>")

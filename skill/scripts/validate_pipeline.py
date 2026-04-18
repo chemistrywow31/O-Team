@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import utils
+from .prompt import NODE_REF_PATTERN, resolve_prompt_text
 from .validate_path import validate_team_path
 
 
@@ -232,6 +233,29 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                 result["warnings"].append({
                     "check": "node_timeout",
                     "message": f"{node_label} ({node_id}): timeout 值無效 ({timeout})，將使用預設 1800",
+                })
+
+    # Check {{node:<id>}} references in prompts
+    all_ids = [n.get("id", "") for n in nodes]
+    id_set = set(filter(None, all_ids))
+    for i, node in enumerate(nodes):
+        node_id = node.get("id", "")
+        prompt_text = resolve_prompt_text(node, pipeline_path)
+        if not prompt_text:
+            continue
+        for match in NODE_REF_PATTERN.finditer(prompt_text):
+            ref_id = match.group(1)
+            if ref_id not in id_set:
+                result["warnings"].append({
+                    "check": "node_ref_unknown",
+                    "message": f"Node {i+1} ({node_id}): 引用未知節點 '{{{{node:{ref_id}}}}}'",
+                })
+                continue
+            ref_idx = all_ids.index(ref_id)
+            if ref_idx >= i:
+                result["warnings"].append({
+                    "check": "node_ref_order",
+                    "message": f"Node {i+1} ({node_id}): 引用的節點 '{ref_id}' 尚未執行（在自己或之後）",
                 })
 
     # Final verdict

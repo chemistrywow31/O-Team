@@ -144,23 +144,84 @@ function _updateSettingsStatusline(settingsPath, newCommand) {
 }
 
 // ---------------------------------------------------------------------------
+// Banner animation
+// ---------------------------------------------------------------------------
+
+const BANNER_LINES = [
+  "     ___        _____",
+  "    / _ \\      |_   _|__  __ _ _ __ ___",
+  "   | | | |_____  | |/ _ \\/ _` | '_ ` _ \\",
+  "   | |_| |_____| | |  __/ (_| | | | | | |",
+  "    \\___/        |_|\\___|\\__,_|_| |_| |_|",
+  "                  Agent Office",
+];
+// Cyan → blue → magenta gradient, mirrored, so the top and bottom feel
+// symmetric when the eye scans the block.
+const BANNER_COLORS = [
+  "\x1b[96m", "\x1b[94m", "\x1b[95m",
+  "\x1b[95m", "\x1b[94m", "\x1b[96m",
+];
+
+function sleepSync(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { /* busy wait — < 1s total across all calls */ }
+}
+
+function showBanner() {
+  const RESET = "\x1b[0m";
+  const HIGHLIGHT = "\x1b[97m\x1b[1m"; // bright white bold for sweep flash
+  const DIM = "\x1b[2m";
+
+  const animate =
+    process.stdout.isTTY && !process.env.NO_COLOR && !process.env.CI;
+
+  if (!animate) {
+    console.log("");
+    for (const line of BANNER_LINES) console.log(line);
+    console.log("");
+    console.log("  Multi-team AI Agent Pipeline Orchestrator");
+    console.log("  ─────────────────────────────────────────");
+    console.log("");
+    return;
+  }
+
+  console.log("");
+
+  // Phase 1: reveal — drop each line in sequence, coloured per the gradient
+  for (let i = 0; i < BANNER_LINES.length; i++) {
+    process.stdout.write(`${BANNER_COLORS[i]}${BANNER_LINES[i]}${RESET}\n`);
+    sleepSync(55);
+  }
+
+  // Phase 2: scan sweep — a bright-white highlight rolls top-to-bottom and
+  // settles back to the gradient colour, giving a gentle "power on" feel.
+  for (let i = 0; i < BANNER_LINES.length; i++) {
+    const up = BANNER_LINES.length - i;
+    process.stdout.write(
+      `\x1b[${up}A\r\x1b[2K${HIGHLIGHT}${BANNER_LINES[i]}${RESET}`,
+    );
+    sleepSync(22);
+    process.stdout.write(
+      `\r\x1b[2K${BANNER_COLORS[i]}${BANNER_LINES[i]}${RESET}`,
+    );
+    process.stdout.write(`\x1b[${up}B\r`);
+  }
+
+  sleepSync(120);
+  console.log("");
+  console.log(`  ${DIM}Multi-team AI Agent Pipeline Orchestrator${RESET}`);
+  console.log(`  ${DIM}─────────────────────────────────────────${RESET}`);
+  console.log("");
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 const args = process.argv.slice(2);
 const isUninstall = args.includes("--uninstall") || args.includes("uninstall");
 
-console.log("");
-console.log("     ___        _____");
-console.log("    / _ \\      |_   _|__  __ _ _ __ ___");
-console.log("   | | | |_____  | |/ _ \\/ _` | '_ ` _ \\");
-console.log("   | |_| |_____| | |  __/ (_| | | | | | |");
-console.log("    \\___/        |_|\\___|\\__,_|_| |_| |_|");
-console.log("                  Agent Office");
-console.log("");
-console.log("  Multi-team AI Agent Pipeline Orchestrator");
-console.log("  ─────────────────────────────────────────");
-console.log("");
+showBanner();
 
 if (isUninstall) {
   if (fs.existsSync(TARGET_DIR)) {

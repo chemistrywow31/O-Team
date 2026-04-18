@@ -116,20 +116,22 @@ Every node can independently set:
 
 ### Cross-node references
 
-Later nodes can pull in outputs from any prior step — not just the immediately preceding one:
+Later nodes can pull in outputs from any prior step — not just the immediately preceding one. Two equivalent syntaxes:
 
 ```yaml
 - id: 03-report
   prompt: |
     Combine these inputs:
 
-    Original facts: {{node:01-extract}}
-    Analysis:       {{node:02-analyse}}
+    Original facts: {{step:1}}              # by position (1-based)
+    Analysis:       {{node:02-analyse}}     # by explicit id
 
     ...produce the final brief.
 ```
 
-At prompt-assembly time each `{{node:<id>}}` tag is replaced with `<output id="<id>">...content of that node's output.md...</output>`. Every completed node's output is also auto-copied to `workspace/<node_id>.md`, so a node can instead read it via the Read tool if the content is too large to inline.
+`{{step:N}}` is usually easiest — it matches the "Step 1, Step 2, …" numbering you see in the chain builder. `{{node:<id>}}` is useful when you want the reference to survive reordering.
+
+At prompt-assembly time each tag is replaced with `<output id="<id>">...content of that node's output.md...</output>`. Every completed node's output is also auto-copied to `workspace/<node_id>.md`, so a node can instead read it via the Read tool if the content is too large to inline.
 
 ### Example pipeline
 
@@ -325,20 +327,22 @@ O-Team 把 chain 中的每一環獨立出來，賦予：
 
 ### 跨節點引用
 
-後續節點可以取用任何先前步驟的 output，不只上一步：
+後續節點可以取用任何先前步驟的 output，不只上一步。兩種等價語法擇一使用：
 
 ```yaml
 - id: 03-report
   prompt: |
     整合以下資料：
 
-    原始事實：{{node:01-extract}}
-    分析結果：{{node:02-analyse}}
+    原始事實：{{step:1}}              # 用位置編號（從 1 開始）
+    分析結果：{{node:02-analyse}}     # 用明確 id
 
     ...產出最終報告。
 ```
 
-組 prompt 時，每個 `{{node:<id>}}` tag 會被替換成 `<output id="<id>">...該節點 output.md 的內容...</output>`。每個完成節點的 output 也會自動複製到 `workspace/<node_id>.md`，內容太大時可以讓節點改用 Read tool 讀取。
+`{{step:N}}` 最直覺，數字對應 chain builder 裡「Step 1、Step 2…」的編號。`{{node:<id>}}` 適合想讓引用在步驟重排後仍然正確的情況。
+
+組 prompt 時，每個 tag 會被替換成 `<output id="<id>">...該節點 output.md 的內容...</output>`。每個完成節點的 output 也會自動複製到 `workspace/<node_id>.md`，內容太大時可以讓節點改用 Read tool 讀取。
 
 ### 範例 pipeline
 

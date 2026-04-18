@@ -12,25 +12,24 @@ created_at: "2026-04-18T00:00:00+08:00"
 # HOW TO REFERENCE A PRIOR STEP'S OUTPUT
 # =============================================================================
 #
-#   Inside any node's `prompt` text, write:
+#   Two equivalent syntaxes — pick whichever is more readable:
 #
-#       {{node:<id>}}
+#     {{step:N}}      — by position, 1-based (e.g. {{step:1}} = first node)
+#     {{node:<id>}}   — by explicit id  (e.g. {{node:01-extract}})
 #
-#   …where <id> is the `id:` field of an EARLIER node. At runtime the tag is
-#   replaced with:
+#   At runtime BOTH are replaced with:
 #
 #       <output id="<id>">
 #       ...the full content of that node's output.md...
 #       </output>
 #
 #   Rules:
-#     - The <id> must exactly match an earlier node's `id:` (validator
-#       warns if it doesn't, or if it points to a later node).
-#     - You can reference MULTIPLE prior nodes in the same prompt.
+#     - Must refer to an EARLIER node. Validator warns on out-of-range or
+#       forward references.
+#     - Multiple references in the same prompt are fine.
 #     - By default every node already receives the IMMEDIATELY preceding
-#       node's output as input.md — so you only need {{node:<id>}} when you
-#       want to pull in outputs from steps further back, or multiple steps
-#       at once.
+#       node's output as input.md — so you only need a reference tag when
+#       you want to pull in steps further back, or multiple steps at once.
 #     - If the referenced output is huge, prefer reading it from the
 #       workspace: every completed node's output.md is auto-copied to
 #       workspace/<id>.md, and your prompt can just say
@@ -129,11 +128,14 @@ nodes:
       Produce a decision-ready brief, under 500 words. Cite which step each
       claim comes from.
 
-      ── Extracted facts (Node 1) ────────────────────────────
-      {{node:01-extract}}
+      # Mix of both reference syntaxes — {{step:N}} and {{node:<id>}} are
+      # equivalent. Use whichever reads more naturally.
 
-      ── Analysis (Node 2) ───────────────────────────────────
-      {{node:02-analyse}}
+      ── Extracted facts (Step 1) ────────────────────────────
+      {{step:1}}
+
+      ── Analysis (Step 2) ───────────────────────────────────
+      {{step:2}}
 
       ── Critique (Node 3) ───────────────────────────────────
       {{node:03-critique}}

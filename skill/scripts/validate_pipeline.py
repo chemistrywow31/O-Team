@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from . import utils
-from .prompt import NODE_REF_PATTERN, resolve_prompt_text
+from .prompt import NODE_REF_PATTERN, STEP_REF_PATTERN, resolve_prompt_text
 from .validate_path import validate_team_path
 
 
@@ -350,7 +350,7 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                     "message": f"{node_label} ({node_id}): effort 必須是 {sorted(VALID_EFFORTS)} 其中之一，目前是 '{effort}'{hint}",
                 })
 
-    # Check {{node:<id>}} references in prompts
+    # Check {{node:<id>}} and {{step:N}} references in prompts
     all_ids = [n.get("id", "") for n in nodes]
     id_set = set(filter(None, all_ids))
     for i, node in enumerate(nodes):
@@ -358,6 +358,8 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
         prompt_text = resolve_prompt_text(node, pipeline_path)
         if not prompt_text:
             continue
+
+        # {{node:<id>}}
         for match in NODE_REF_PATTERN.finditer(prompt_text):
             ref_id = match.group(1)
             if ref_id not in id_set:
@@ -371,6 +373,21 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                 result["warnings"].append({
                     "check": "node_ref_order",
                     "message": f"Node {i+1} ({node_id}): 引用的節點 '{ref_id}' 尚未執行（在自己或之後）",
+                })
+
+        # {{step:N}}
+        for match in STEP_REF_PATTERN.finditer(prompt_text):
+            n = int(match.group(1))
+            if n < 1 or n > len(nodes):
+                result["warnings"].append({
+                    "check": "step_ref_out_of_range",
+                    "message": f"Node {i+1} ({node_id}): 引用 '{{{{step:{n}}}}}' 超出範圍（pipeline 只有 {len(nodes)} 步）",
+                })
+                continue
+            if n - 1 >= i:
+                result["warnings"].append({
+                    "check": "step_ref_order",
+                    "message": f"Node {i+1} ({node_id}): 引用第 {n} 步尚未執行（在自己或之後）",
                 })
 
     # Final verdict

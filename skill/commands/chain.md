@@ -112,7 +112,24 @@ PYTHONPATH=.claude/skills/ot python -m scripts.chain "<path>" --json
 
 ### Step 3: Summary
 
-Show: pipeline name, step count, output YAML path.
+Show:
+- Pipeline name
+- Step count
+- Output YAML path
+- **The resolved node ID for each step** — format one line per step:
+  ```
+  Step 1  id = 01-extract
+  Step 2  id = 02-analyse
+  Step 3  id = 03-critique
+  ```
+- A one-line hint on how to reference prior steps in later prompts:
+  ```
+  To reference a prior step in a later prompt, use {{step:N}} (by position,
+  e.g. {{step:1}}) or {{node:<id>}} (by id, e.g. {{node:01-extract}}).
+  ```
+
+The build script returns `nodes: [{id, mode, type}, ...]` — use this to
+populate the list.
 
 ### Step 4: Run
 

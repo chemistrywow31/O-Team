@@ -4,6 +4,7 @@ Extracts the common prompt-building logic used by both run_pipeline.py
 and execute_node.py so each module delegates here instead of duplicating.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -11,30 +12,63 @@ from . import utils
 
 
 NODE_REF_PATTERN = re.compile(r"\{\{\s*node\s*:\s*([a-zA-Z0-9_\-.]+)\s*\}\}")
+STEP_REF_PATTERN = re.compile(r"\{\{\s*step\s*:\s*(\d+)\s*\}\}")
+
+
+def _load_sandbox_node_ids(sandbox: Path) -> list[str]:
+    """Return the ordered list of node IDs for the sandbox, or [] if unknown."""
+    meta_file = sandbox / "meta.json"
+    if not meta_file.exists():
+        return []
+    try:
+        meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        return [n.get("id", "") for n in meta.get("nodes", []) if n.get("id")]
+    except Exception:
+        return []
+
+
+def _render_output(sandbox: Path, node_id: str, display: str | None = None) -> str:
+    """Read a node's output.md and render it as <output id="..."> XML."""
+    output_file = sandbox / node_id / "output.md"
+    label = display or node_id
+    if output_file.exists():
+        try:
+            content = output_file.read_text(encoding="utf-8").strip()
+            return f'<output id="{label}">\n{content}\n</output>'
+        except Exception:
+            return f'<output id="{label}" status="read_error"/>'
+    return f'<output id="{label}" status="not_yet_available"/>'
 
 
 def expand_node_refs(text: str, sandbox: Path) -> str:
-    """Expand {{node:<id>}} tags with the referenced node's output.md content.
+    """Expand {{node:<id>}} and {{step:N}} tags into the referenced node's output.
 
-    Replaces each tag with <output id="<id>">...</output>. If the referenced
-    node has not produced output yet, inserts a placeholder tag so the LLM
-    can see the reference but knows the data is missing.
+    - `{{node:<id>}}` — explicit node id reference (e.g. `{{node:01-extract}}`)
+    - `{{step:N}}`    — 1-based positional reference (e.g. `{{step:1}}` = first node)
+
+    Both forms are replaced with `<output id="<id>">...output.md content...</output>`.
+    If the referenced node has not executed yet (or the position is invalid),
+    inserts a placeholder tag so the LLM sees the reference but knows the data
+    is missing.
     """
     if not text or "{{" not in text:
         return text
 
-    def _replace(match: re.Match) -> str:
-        node_id = match.group(1)
-        output_file = sandbox / node_id / "output.md"
-        if output_file.exists():
-            try:
-                content = output_file.read_text(encoding="utf-8").strip()
-                return f'<output id="{node_id}">\n{content}\n</output>'
-            except Exception:
-                return f'<output id="{node_id}" status="read_error"/>'
-        return f'<output id="{node_id}" status="not_yet_available"/>'
+    node_ids = _load_sandbox_node_ids(sandbox)
 
-    return NODE_REF_PATTERN.sub(_replace, text)
+    def _step_replace(match: re.Match) -> str:
+        n = int(match.group(1))
+        if n < 1 or n > len(node_ids):
+            return f'<output step="{n}" status="out_of_range"/>'
+        node_id = node_ids[n - 1]
+        return _render_output(sandbox, node_id, display=node_id)
+
+    def _node_replace(match: re.Match) -> str:
+        return _render_output(sandbox, match.group(1))
+
+    text = STEP_REF_PATTERN.sub(_step_replace, text)
+    text = NODE_REF_PATTERN.sub(_node_replace, text)
+    return text
 
 
 def list_workspace_files(workspace: Path) -> list[str]:

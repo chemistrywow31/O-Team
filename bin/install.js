@@ -172,8 +172,10 @@ function buildLogo(text) {
   return rows;
 }
 
-// 256-colour horizontal gradient: cyan → light blue → purple → magenta → pink
-const PALETTE = [51, 45, 39, 33, 75, 99, 135, 165, 201, 207, 213];
+// 256-colour horizontal gradient — warm gold. Pale cream at the edges
+// deepens into rich gold and a touch of amber at the centre. Mirrored so
+// both ends catch light evenly — reads as polished metal, not neon.
+const PALETTE = [229, 222, 221, 220, 214, 172, 214, 220, 221, 222, 229];
 
 function sleepSync(ms) {
   const end = Date.now() + ms;
@@ -207,6 +209,25 @@ function redrawFrame(rows, highlightCol) {
     process.stdout.write(`\x1b[${up}A\r\x1b[2K${paintRow(rows[r], highlightCol)}`);
     process.stdout.write(`\x1b[${up}B\r`);
   }
+}
+
+function redrawSolid(rows, colorCode) {
+  // Repaint every row in a single colour — used for the flash finale.
+  for (let r = 0; r < rows.length; r++) {
+    const up = rows.length - r;
+    process.stdout.write(`\x1b[${up}A\r\x1b[2K${colorCode}${rows[r]}\x1b[0m`);
+    process.stdout.write(`\x1b[${up}B\r`);
+  }
+}
+
+function drawAt(totalRows, row, col, text) {
+  // Write `text` at (row, col) within the banner, assuming cursor is on the
+  // line immediately below the last banner row. Returns cursor to origin.
+  const up = totalRows - row;
+  process.stdout.write(`\x1b[${up}A\r`);
+  if (col > 0) process.stdout.write(`\x1b[${col}C`);
+  process.stdout.write(text);
+  process.stdout.write(`\r\x1b[${up}B`);
 }
 
 function showBanner() {
@@ -257,10 +278,54 @@ function showBanner() {
     redrawFrame(logo, c);
     sleepSync(45);
   }
-  // One final redraw with no highlight, so we end on clean gradient
+  // Settle back to clean gradient before the flash finale
   redrawFrame(logo, -1);
+  sleepSync(120);
 
-  sleepSync(300);
+  // Phase 2.5: flash finale — two bright-white pulses, then a gold pop,
+  // then settle back to gradient. Gives the whole reveal a "ta-da" finish.
+  const WHITE_FLASH = "\x1b[97m\x1b[1m";
+  const GOLD_FLASH = "\x1b[93m\x1b[1m";
+
+  redrawSolid(logo, WHITE_FLASH);
+  sleepSync(80);
+  redrawFrame(logo, -1);
+  sleepSync(70);
+  redrawSolid(logo, WHITE_FLASH);
+  sleepSync(90);
+  redrawSolid(logo, GOLD_FLASH);
+  sleepSync(110);
+  redrawFrame(logo, -1);
+  sleepSync(200);
+
+  // Phase 2.7: sparkle at the top-right of the M — a small star pops out,
+  // flares bright, then fades, like the logo just "arrived".
+  //   M occupies cols 30-34; top-right corner is (row 0, col 34).
+  //   We put the sparkle just past it at col 36 so the M itself stays
+  //   in gradient colour and the sparkle reads as a separate accent.
+  const SPARKLE_ROW = 0;
+  const SPARKLE_COL = 36;
+  const sparkleFrames = [
+    { ch: "·", color: "\x1b[93m" },
+    { ch: "+", color: "\x1b[93m\x1b[1m" },
+    { ch: "✦", color: "\x1b[97m\x1b[1m" },
+    { ch: "✧", color: "\x1b[97m\x1b[1m" },
+    { ch: "✦", color: "\x1b[93m\x1b[1m" },
+    { ch: "+", color: "\x1b[93m" },
+    { ch: "·", color: "\x1b[33m" },
+    { ch: " ", color: "" },
+  ];
+  for (const frame of sparkleFrames) {
+    drawAt(
+      logo.length,
+      SPARKLE_ROW,
+      SPARKLE_COL,
+      `${frame.color}${frame.ch}\x1b[0m`,
+    );
+    sleepSync(85);
+  }
+
+  sleepSync(200);
 
   // Phase 3: subtitle drops in below the logo
   console.log("");
@@ -278,8 +343,14 @@ function showBanner() {
 
 const args = process.argv.slice(2);
 const isUninstall = args.includes("--uninstall") || args.includes("uninstall");
+const isPreview = args.includes("--preview");
 
 showBanner();
+
+if (isPreview) {
+  // Preview mode — play the banner and exit without touching anything.
+  process.exit(0);
+}
 
 if (isUninstall) {
   if (fs.existsSync(TARGET_DIR)) {

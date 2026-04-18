@@ -87,13 +87,20 @@ def setup_run(
     (sandbox / "workspace").mkdir(exist_ok=True)
 
     # Create office folders and copy team configs
+    pipeline_path = Path(pipeline_path) if isinstance(pipeline_path, str) else None
     nodes_state = []
     for i, node in enumerate(pipeline["nodes"]):
         office = sandbox / node["id"]
         office.mkdir(exist_ok=True)
 
-        team_path = Path(node["team_path"])
-        utils.copy_team_config(team_path, office)
+        # Determine node type and setup accordingly
+        has_team = bool(node.get("team")) and bool(node.get("team_path"))
+        if has_team:
+            team_path = Path(node["team_path"])
+            utils.copy_team_config(team_path, office)
+        else:
+            # Prompt-only node: setup minimal office
+            utils.setup_prompt_node(node, office, pipeline_path or Path.cwd())
 
         # Mark earlier nodes as COMPLETE when using --from
         if from_node is not None and i < start_index:
@@ -108,11 +115,13 @@ def setup_run(
 
         nodes_state.append({
             "id": node["id"],
-            "team": node["team"],
-            "team_path": node["team_path"],
+            "team": node.get("team", ""),
+            "team_path": node.get("team_path", ""),
             "mode": node["mode"],
-            "prompt": node["prompt"],
+            "prompt": node.get("prompt", ""),
+            "prompt_file": node.get("prompt_file", ""),
             "timeout": node.get("timeout", utils.DEFAULT_TIMEOUT),
+            "node_type": "team" if has_team else "prompt",
             "state": state,
             "exit_code": None,
             "error": None,

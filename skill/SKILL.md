@@ -29,7 +29,12 @@ O-Team supports English (en) and Traditional Chinese (zh-TW).
 
 ## Purpose
 
-Enable users to register A-Team generated agent teams, build named execution pipelines by selecting and ordering teams, and run pipelines where each node operates in isolated context with its own team identity. Teams collaborate exclusively through handoff files (input.md / output.md).
+Enable users to build and execute AI agent pipelines in two modes:
+
+1. **Team Pipeline** — Register A-Team generated agent teams, build named pipelines by selecting and ordering teams. Each node runs a full team with its own coordinator, agents, skills, and rules.
+2. **Prompt Chain** — Define lightweight prompt chains where each node is a standalone prompt. No team folder required — just write prompts inline or as .md files.
+
+Both modes can be mixed in a single pipeline. Every node operates in isolated context with its own identity. Nodes collaborate exclusively through handoff files (input.md / output.md).
 
 ## Commands
 
@@ -37,7 +42,8 @@ Enable users to register A-Team generated agent teams, build named execution pip
 |-------|-------------|-------------|
 | `/ot:demo` | — | Guided tutorial — experience a full pipeline |
 | `/ot:reg [add\|rm]` | `/o-team:registry` | Manage team registry |
-| `/ot:build` | `/o-team:build` | Build a pipeline interactively |
+| `/ot:build` | `/o-team:build` | Build a team pipeline interactively |
+| `/ot:chain [path]` | `/o-team:chain` | Build pipeline from prompt chain directory |
 | `/ot:run [name]` | `/o-team:run` | Execute a pipeline |
 | `/ot:pipe [show\|rm]` | `/o-team:pipeline` | Manage saved pipelines |
 | `/ot:status` | `/o-team:status` | Check run status |

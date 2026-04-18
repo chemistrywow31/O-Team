@@ -30,10 +30,18 @@ def create_pipeline(
 
     Args:
         name: Pipeline name (will be slugified for filename)
-        nodes_json: JSON string of node array, each with:
+        nodes_json: JSON string of node array. Each node must have one of:
+            Team node:
             - team: team slug (from registry)
             - mode: "auto" or "gate"
             - prompt: prompt text for this node
+            - timeout: (optional) timeout in seconds
+            Prompt node (no team):
+            - prompt: inline prompt text
+            - prompt_file: (optional) path to external prompt file
+            - identity: (optional) CLAUDE.md content for the node
+            - rules: (optional) list of rule file paths
+            - mode: "auto" or "gate"
             - timeout: (optional) timeout in seconds
         objective: Overall pipeline objective description
         output_path: (optional) output file path, defaults to
@@ -61,44 +69,65 @@ def create_pipeline(
     errors = []
 
     for i, node in enumerate(nodes):
-        team_slug = node.get("team")
-        if not team_slug:
-            errors.append(f"Node {i+1}: missing 'team' field")
-            continue
-
-        team = teams_by_slug.get(team_slug)
-        if not team:
-            errors.append(
-                f"Node {i+1}: team '{team_slug}' not found in registry. "
-                f"Available: {', '.join(teams_by_slug.keys())}"
-            )
-            continue
-
-        # Validate team path still exists
-        team_path = Path(team["path"])
-        if not team_path.exists():
-            errors.append(
-                f"Node {i+1}: team '{team_slug}' path no longer exists: {team['path']}"
-            )
-            continue
+        team_slug = node.get("team", "")
+        has_prompt = bool(node.get("prompt", "").strip())
+        has_prompt_file = bool(node.get("prompt_file", "").strip())
 
         mode = node.get("mode", "gate")
         if mode not in ("auto", "gate"):
             errors.append(f"Node {i+1}: mode must be 'auto' or 'gate', got '{mode}'")
             continue
 
-        node_id = f"{i+1:02d}-{team_slug}"
-        prompt = node.get("prompt", "")
         timeout = node.get("timeout", utils.DEFAULT_TIMEOUT)
 
-        pipeline_nodes.append({
-            "id": node_id,
-            "team": team_slug,
-            "team_path": str(team_path),
-            "mode": mode,
-            "prompt": prompt,
-            "timeout": timeout,
-        })
+        if team_slug:
+            # --- Team node ---
+            team = teams_by_slug.get(team_slug)
+            if not team:
+                errors.append(
+                    f"Node {i+1}: team '{team_slug}' not found in registry. "
+                    f"Available: {', '.join(teams_by_slug.keys())}"
+                )
+                continue
+
+            team_path = Path(team["path"])
+            if not team_path.exists():
+                errors.append(
+                    f"Node {i+1}: team '{team_slug}' path no longer exists: {team['path']}"
+                )
+                continue
+
+            node_id = node.get("id") or f"{i+1:02d}-{team_slug}"
+            pipeline_node = {
+                "id": node_id,
+                "team": team_slug,
+                "team_path": str(team_path),
+                "mode": mode,
+                "prompt": node.get("prompt", ""),
+                "timeout": timeout,
+            }
+        elif has_prompt or has_prompt_file:
+            # --- Prompt node ---
+            node_id = node.get("id") or f"{i+1:02d}-prompt"
+            pipeline_node = {
+                "id": node_id,
+                "mode": mode,
+                "prompt": node.get("prompt", ""),
+                "timeout": timeout,
+            }
+            if has_prompt_file:
+                pipeline_node["prompt_file"] = node["prompt_file"]
+            if node.get("identity", "").strip():
+                pipeline_node["identity"] = node["identity"]
+            if node.get("rules"):
+                pipeline_node["rules"] = node["rules"]
+        else:
+            errors.append(
+                f"Node {i+1}: must have 'team' or 'prompt'/'prompt_file'"
+            )
+            continue
+
+        pipeline_nodes.append(pipeline_node)
 
     if errors:
         return {"success": False, "errors": errors}

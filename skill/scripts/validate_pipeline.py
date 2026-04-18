@@ -15,14 +15,29 @@ from . import utils
 from .validate_path import validate_team_path
 
 
+def _is_prompt_node(node: dict) -> bool:
+    """Check if a node is a prompt-only node (no team required)."""
+    has_team = bool(node.get("team"))
+    has_prompt = bool(node.get("prompt", "").strip())
+    has_prompt_file = bool(node.get("prompt_file", "").strip())
+    return not has_team and (has_prompt or has_prompt_file)
+
+
+def _resolve_prompt_file(prompt_file: str, pipeline_path: Path) -> Path:
+    """Resolve a prompt_file path relative to the pipeline YAML location."""
+    p = Path(prompt_file)
+    if p.is_absolute():
+        return p
+    return (pipeline_path.parent / p).resolve()
+
+
 def validate_pipeline(pipeline_path_str: str) -> dict:
     """Validate a pipeline YAML file.
 
     Checks:
     - YAML is parseable and has required fields
-    - All team slugs exist in registry
-    - All team_path directories still exist and are valid
-    - All nodes have non-empty prompts
+    - Team nodes: team slugs exist in registry, team_path valid
+    - Prompt nodes: prompt or prompt_file present, prompt_file exists
     - Mode values are valid
     - Node IDs are unique
 
@@ -112,13 +127,36 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
             })
             continue
 
-        # Check required node fields
-        for field in ["id", "team", "team_path", "mode"]:
-            if field not in node:
-                result["issues"].append({
-                    "check": "node_field",
-                    "message": f"{node_label}: 缺少欄位 '{field}'",
-                })
+        is_prompt = _is_prompt_node(node)
+
+        # Check required fields based on node type
+        if not node.get("id"):
+            result["issues"].append({
+                "check": "node_field",
+                "message": f"{node_label}: 缺少欄位 'id'",
+            })
+        if not node.get("mode"):
+            result["issues"].append({
+                "check": "node_field",
+                "message": f"{node_label}: 缺少欄位 'mode'",
+            })
+
+        # Must have team OR prompt/prompt_file
+        has_team = bool(node.get("team"))
+        has_prompt = bool(node.get("prompt", "").strip())
+        has_prompt_file = bool(node.get("prompt_file", "").strip())
+        if not has_team and not has_prompt and not has_prompt_file:
+            result["issues"].append({
+                "check": "node_source",
+                "message": f"{node_label}: 必須有 'team' 或 'prompt'/'prompt_file' 其中之一",
+            })
+
+        # Team node: require team_path
+        if has_team and not node.get("team_path") and not is_prompt:
+            result["issues"].append({
+                "check": "node_field",
+                "message": f"{node_label}: team node 缺少欄位 'team_path'",
+            })
 
         # Check unique ID
         node_id = node.get("id", "")
@@ -137,36 +175,55 @@ def validate_pipeline(pipeline_path_str: str) -> dict:
                 "message": f"{node_label} ({node_id}): mode 必須是 'auto' 或 'gate'，目前是 '{mode}'",
             })
 
-        # Check team in registry
-        team_slug = node.get("team", "")
-        if team_slug and team_slug not in teams_by_slug:
-            result["issues"].append({
-                "check": "team_registered",
-                "message": f"{node_label} ({node_id}): team '{team_slug}' 不在 registry 中",
-            })
+        if is_prompt:
+            # --- Prompt node validation ---
+            if has_prompt_file:
+                pf_path = _resolve_prompt_file(node["prompt_file"], pipeline_path)
+                if not pf_path.exists():
+                    result["issues"].append({
+                        "check": "prompt_file_exists",
+                        "message": f"{node_label} ({node_id}): prompt_file 不存在: {pf_path}",
+                    })
 
-        # Check team_path exists and is valid
-        team_path = node.get("team_path", "")
-        if team_path:
-            path_obj = Path(team_path)
-            if not path_obj.exists():
+            # Validate rules paths
+            for rule_path_str in node.get("rules", []):
+                rp = Path(rule_path_str)
+                if not rp.is_absolute():
+                    rp = (pipeline_path.parent / rp).resolve()
+                if not rp.exists():
+                    result["issues"].append({
+                        "check": "rule_file_exists",
+                        "message": f"{node_label} ({node_id}): rule 檔案不存在: {rp}",
+                    })
+        else:
+            # --- Team node validation ---
+            team_slug = node.get("team", "")
+            if team_slug and team_slug not in teams_by_slug:
                 result["issues"].append({
-                    "check": "team_path_exists",
-                    "message": f"{node_label} ({node_id}): team_path 不存在: {team_path}",
-                })
-            elif not (path_obj / "CLAUDE.md").exists():
-                result["issues"].append({
-                    "check": "team_path_valid",
-                    "message": f"{node_label} ({node_id}): team_path 缺少 CLAUDE.md: {team_path}",
+                    "check": "team_registered",
+                    "message": f"{node_label} ({node_id}): team '{team_slug}' 不在 registry 中",
                 })
 
-        # Check prompt
-        prompt = node.get("prompt", "")
-        if not prompt or not prompt.strip():
-            result["warnings"].append({
-                "check": "node_prompt",
-                "message": f"{node_label} ({node_id}): prompt 為空，執行時將只依賴團隊 CLAUDE.md",
-            })
+            team_path = node.get("team_path", "")
+            if team_path:
+                path_obj = Path(team_path)
+                if not path_obj.exists():
+                    result["issues"].append({
+                        "check": "team_path_exists",
+                        "message": f"{node_label} ({node_id}): team_path 不存在: {team_path}",
+                    })
+                elif not (path_obj / "CLAUDE.md").exists():
+                    result["issues"].append({
+                        "check": "team_path_valid",
+                        "message": f"{node_label} ({node_id}): team_path 缺少 CLAUDE.md: {team_path}",
+                    })
+
+            # Check prompt for team nodes
+            if not has_prompt and not has_prompt_file:
+                result["warnings"].append({
+                    "check": "node_prompt",
+                    "message": f"{node_label} ({node_id}): prompt 為空，執行時將只依賴團隊 CLAUDE.md",
+                })
 
         # Check timeout
         timeout = node.get("timeout")

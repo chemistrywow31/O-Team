@@ -35,6 +35,49 @@ def human_size(size_bytes: int) -> str:
     return f"{size_bytes:.0f}TB"
 
 
+def read_entry_skill(office: Path) -> str:
+    """Read the boss entry-point skill from a team's office folder.
+
+    Returns the skill content (frontmatter stripped) or empty string.
+    """
+    boss_skill = office / ".claude" / "skills" / "boss" / "SKILL.md"
+    if not boss_skill.exists():
+        return ""
+    try:
+        content = boss_skill.read_text(encoding="utf-8").strip()
+        # Strip YAML frontmatter
+        if content.startswith("---"):
+            end = content.find("---", 3)
+            if end != -1:
+                content = content[end + 3:].strip()
+        return content
+    except Exception:
+        return ""
+
+
+def resolve_prompt_text(node: dict, pipeline_path: Path | None = None) -> str:
+    """Resolve the prompt text for a node.
+
+    Prefers inline prompt; falls back to prompt_file.
+    """
+    prompt_text = node.get("prompt", "").strip()
+    if prompt_text:
+        return prompt_text
+
+    prompt_file = node.get("prompt_file", "").strip()
+    if prompt_file:
+        pf = Path(prompt_file)
+        if not pf.is_absolute() and pipeline_path:
+            pf = (pipeline_path.parent / pf).resolve()
+        if pf.exists():
+            try:
+                return pf.read_text(encoding="utf-8").strip()
+            except Exception:
+                pass
+
+    return ""
+
+
 def assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
     """Assemble the complete prompt for a node.
 
@@ -42,18 +85,24 @@ def assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
     1. Context from input.md (if exists)
     2. Workspace file listing
     3. Team rules from .claude/rules/*.md
-    4. Node-specific instructions (from pipeline prompt field)
-    5. Output instruction
+    4. Entry skill (for team nodes only — enables coordinator workflow)
+    5. Node-specific instructions (from pipeline prompt field or prompt_file)
+    6. Output instruction
 
     Variable data sections are wrapped in XML tags for better Claude parsing.
     """
     office = sandbox / node["id"]
     workspace = sandbox / "workspace"
+    is_team_node = bool(node.get("team"))
     parts = []
 
     # Header
-    parts.append(f"# O-Team Pipeline Task")
-    parts.append(f"# Node: {node['id']} | Team: {node['team']}")
+    if is_team_node:
+        parts.append(f"# O-Team Pipeline Task")
+        parts.append(f"# Node: {node['id']} | Team: {node['team']}")
+    else:
+        parts.append(f"# O-Team Pipeline Task")
+        parts.append(f"# Node: {node['id']} | Prompt Node")
     parts.append("")
 
     # Context from input.md
@@ -112,13 +161,26 @@ def assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
                 except Exception:
                     pass
 
+    # Entry skill injection (team nodes only)
+    if is_team_node:
+        entry_skill = read_entry_skill(office)
+        if entry_skill:
+            parts.append("## Entry Workflow")
+            parts.append("")
+            parts.append("Follow this workflow to execute the team's full process:")
+            parts.append("")
+            parts.append("<entry_skill>")
+            parts.append(entry_skill)
+            parts.append("</entry_skill>")
+            parts.append("")
+
     # Node-specific instructions
-    prompt_text = node.get("prompt", "")
-    if prompt_text and prompt_text.strip():
+    prompt_text = resolve_prompt_text(node)
+    if prompt_text:
         parts.append("## Instructions")
         parts.append("")
         parts.append("<node_instructions>")
-        parts.append(prompt_text.strip())
+        parts.append(prompt_text)
         parts.append("</node_instructions>")
         parts.append("")
 

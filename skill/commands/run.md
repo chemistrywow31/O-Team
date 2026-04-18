@@ -72,7 +72,7 @@ Save: `run_id`, `sandbox_path`, `nodes`, `total_nodes`, `start_from_index`
 For each node (index `start_from_index` to total_nodes-1, skipping COMPLETE nodes):
 
 #### 4a. Announce
-Tell user: `Node {i+1}/{total}: {node_id} ({team}) [{mode}]`
+Tell user: `Node {i+1}/{total}: {node_id} ({team or "prompt"}) [{mode}]`
 
 #### 4b. Execute (background)
 ```
@@ -107,16 +107,22 @@ Report: tool name, agent name, activity preview.
 
 ### Step 5: Complete
 
-Show final output path.
+#### 5a. Finalize + Archive
 
-#### 5a. Archive prompt
 AskUserQuestion: "Name this run for archiving? (leave empty to skip)"
-- If user provides a name:
-  ```bash
-  PYTHONPATH=.claude/skills/ot python -m scripts.archive_run <sandbox_path> --name "<user-input>" --json
-  ```
-  Show the new archived path from the result.
-- If user skips (empty): continue without archiving.
+
+Run the finalize script — this is a **single atomic call** that handles both completion summary and archiving:
+
+```bash
+# If user provided a name:
+PYTHONPATH=.claude/skills/ot python -m scripts.finalize_run <sandbox_path> --name "<user-input>" --json
+
+# If user skipped (empty):
+PYTHONPATH=.claude/skills/ot python -m scripts.finalize_run <sandbox_path> --skip-archive --json
+```
+
+**CRITICAL**: Always run finalize_run. Do not skip this step. The script returns `output_path` and `archive_path` — display both to the user.
 
 #### 5b. Final
+Show: final output path (and archive path if archived).
 AskUserQuestion: "Show full output" / "Done"

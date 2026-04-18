@@ -301,3 +301,39 @@ def copy_team_config(team_path: Path, office: Path) -> None:
         if dst_claude_dir.exists():
             shutil.rmtree(dst_claude_dir)
         shutil.copytree(src_claude_dir, dst_claude_dir)
+
+
+def setup_prompt_node(node: dict, office: Path, pipeline_path: Path) -> None:
+    """Setup office folder for a prompt-only node (no team).
+
+    Writes identity as CLAUDE.md and copies custom rules if specified.
+    Resolves prompt_file content into the node's prompt field.
+    """
+    import shutil
+
+    # Write identity as CLAUDE.md
+    identity = node.get("identity", "").strip()
+    if identity:
+        write_text(office / "CLAUDE.md", identity)
+
+    # Copy custom rules
+    rules = node.get("rules", [])
+    if rules:
+        rules_dir = office / ".claude" / "rules"
+        rules_dir.mkdir(parents=True, exist_ok=True)
+        for rule_path_str in rules:
+            rp = Path(rule_path_str)
+            if not rp.is_absolute():
+                rp = (pipeline_path.parent / rp).resolve()
+            if rp.exists():
+                shutil.copy2(rp, rules_dir / rp.name)
+
+    # Resolve prompt_file into prompt
+    prompt_file = node.get("prompt_file", "").strip()
+    if prompt_file and not node.get("prompt", "").strip():
+        pf = Path(prompt_file)
+        if not pf.is_absolute():
+            pf = (pipeline_path.parent / pf).resolve()
+        if pf.exists():
+            node["prompt"] = read_text(pf)
+            node["_prompt_file_resolved"] = str(pf)

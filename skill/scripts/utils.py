@@ -122,8 +122,25 @@ def generate_run_id() -> str:
     return uuid.uuid4().hex[:8]
 
 
+def iter_archive_run_dirs(archive_dir: Path):
+    """Yield all archived run directories.
+
+    Supports both the legacy flat layout (archive/<name>-<uuid>/) and the
+    current date-partitioned layout (archive/YYYY/MM/DD/<name>-<uuid>/).
+    A directory is considered a run if it contains a meta.json file.
+    """
+    if not archive_dir.exists():
+        return
+    for meta_path in archive_dir.rglob("meta.json"):
+        if meta_path.is_file():
+            yield meta_path.parent
+
+
 def find_run_dir(run_id: str, project_dir: Path) -> Path | None:
     """Find a run directory by ID, searching both runs/ and archive/.
+
+    archive/ may be flat (archive/<name>-<uuid>) or date-partitioned
+    (archive/YYYY/MM/DD/<name>-<uuid>) — search recursively.
 
     Returns the Path if found, otherwise None.
     """
@@ -132,11 +149,11 @@ def find_run_dir(run_id: str, project_dir: Path) -> Path | None:
     if direct.exists():
         return direct
 
-    # Search archive/ for <name>-<run_id> pattern
+    # Recursive search in archive/ for any folder ending with -<run_id>
     archive_dir = project_dir / ARCHIVE_DIR_NAME
     if archive_dir.exists():
-        for entry in archive_dir.iterdir():
-            if entry.is_dir() and entry.name.endswith(f"-{run_id}"):
+        for entry in archive_dir.rglob(f"*-{run_id}"):
+            if entry.is_dir():
                 return entry
 
     return None

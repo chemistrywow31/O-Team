@@ -516,11 +516,13 @@ def _prompt_archive_run(run_state: dict, sandbox: Path, project_dir: Path) -> Pa
     run_id = run_state["run_id"]
     new_folder_name = f"{run_name}-{run_id}"
 
-    # Create archive directory and move
+    # Create archive directory (date-partitioned) and move
+    from datetime import datetime as _dt
     archive_dir = project_dir / utils.ARCHIVE_DIR_NAME
-    archive_dir.mkdir(parents=True, exist_ok=True)
+    target_dir = archive_dir / _dt.now().strftime("%Y/%m/%d")
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-    new_path = archive_dir / new_folder_name
+    new_path = target_dir / new_folder_name
     sandbox.rename(new_path)
 
     # Update meta.json with run name

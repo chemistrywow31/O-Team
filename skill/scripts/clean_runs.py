@@ -65,8 +65,7 @@ def clean_runs(
     # Collect targets (from both runs/ and archive/)
     all_dirs = list(runs_dir.iterdir()) if runs_dir.exists() else []
     archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
-    if archive_dir.exists():
-        all_dirs.extend(archive_dir.iterdir())
+    all_dirs.extend(utils.iter_archive_run_dirs(archive_dir))
 
     targets = []
     for entry in sorted(all_dirs):
@@ -110,12 +109,9 @@ def clean_runs(
                 state_counts[state] = state_counts.get(state, 0) + 1
 
         archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
-        if archive_dir.exists():
-            for entry in archive_dir.iterdir():
-                if not entry.is_dir():
-                    continue
-                archive_count += 1
-                total_size += _get_dir_size(entry)
+        for entry in utils.iter_archive_run_dirs(archive_dir):
+            archive_count += 1
+            total_size += _get_dir_size(entry)
 
         return {
             "success": True,

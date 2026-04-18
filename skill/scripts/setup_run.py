@@ -224,8 +224,7 @@ def _find_source_run(
     # Find latest run for this pipeline with completed nodes before start_index
     all_dirs = list(runs_dir.iterdir()) if runs_dir.exists() else []
     archive_dir = proj_dir / utils.ARCHIVE_DIR_NAME
-    if archive_dir.exists():
-        all_dirs.extend(archive_dir.iterdir())
+    all_dirs.extend(utils.iter_archive_run_dirs(archive_dir))
 
     best = None
     best_time = ""

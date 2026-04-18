@@ -43,11 +43,13 @@ Collect prompts step by step.
 5. AskUserQuestion: "Configure model / effort per step? (Options: skip / all-same / per-step)"
    - **skip** → use Claude defaults for all steps
    - **all-same** → ask ONCE for default model + effort, apply to every step
-     - AskUserQuestion: "Default model for all steps? (e.g. claude-opus-4-7 / claude-sonnet-4-6 / claude-haiku-4-5-20251001, Enter to skip)"
-     - AskUserQuestion: "Default effort for all steps? (low / medium / high / xhigh / max, Enter to skip)"
+     - AskUserQuestion: "Default model?" — options: `claude-haiku-4-5-20251001` / `claude-sonnet-4-6` / `claude-opus-4-7` / skip (default)
+     - AskUserQuestion: "Default effort?" — options: `skip (default)` / `low` / `medium` / `max`. **Tell the user they may type `high` or `xhigh` for intermediate levels**; AskUserQuestion only shows 4 presets, so `high`/`xhigh` must be entered as free text.
    - **per-step** → for each step i, ask:
-     - AskUserQuestion: "Step {i}: model? (Enter to skip)"
-     - AskUserQuestion: "Step {i}: effort? (low/medium/high/xhigh/max, Enter to skip)"
+     - AskUserQuestion: "Step {i} model?" — same 4 options as above
+     - AskUserQuestion: "Step {i} effort?" — same 4 options as above + mention free-text `high`/`xhigh`
+
+Valid effort values (reject anything else): `low`, `medium`, `high`, `xhigh`, `max`. Valid model values (warn if unexpected): anything starting with `claude-`.
 
 Build the JSON arrays. Use empty strings for steps that should be skipped.
 `--models` and `--efforts` are optional — omit them entirely if the user chose "skip".

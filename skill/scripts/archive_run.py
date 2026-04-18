@@ -9,6 +9,7 @@ Renames the run folder to <name>-<run_id> and moves it to archive/.
 import argparse
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from . import utils
@@ -46,9 +47,11 @@ def archive_run(sandbox_path: str, run_name: str) -> dict:
     # Resolve project dir (sandbox is at .o-team/runs/<id>)
     project_dir = sandbox.parent.parent
     archive_dir = project_dir / utils.ARCHIVE_DIR_NAME
-    archive_dir.mkdir(parents=True, exist_ok=True)
+    date_partition = datetime.now().strftime("%Y/%m/%d")
+    target_dir = archive_dir / date_partition
+    target_dir.mkdir(parents=True, exist_ok=True)
 
-    new_path = archive_dir / new_folder_name
+    new_path = target_dir / new_folder_name
 
     if new_path.exists():
         return {"success": False, "error": f"Archive path already exists: {new_path}"}

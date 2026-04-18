@@ -17,6 +17,7 @@ Usage:
 import argparse
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from . import utils
@@ -94,18 +95,20 @@ def finalize_run(
     if not sanitized:
         return result
 
-    # Perform archive
+    # Perform archive — partition by local date: archive/YYYY/MM/DD/<name>-<uuid>
     project_dir = sandbox.parent.parent  # .o-team/runs/<id> → .o-team
     archive_dir = project_dir / utils.ARCHIVE_DIR_NAME
-    archive_dir.mkdir(parents=True, exist_ok=True)
+    date_partition = datetime.now().strftime("%Y/%m/%d")
+    target_dir = archive_dir / date_partition
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     new_folder = f"{sanitized}-{run_id}"
-    new_path = archive_dir / new_folder
+    new_path = target_dir / new_folder
 
     if new_path.exists():
         # Avoid collision
         new_folder = f"{sanitized}-{run_id}-2"
-        new_path = archive_dir / new_folder
+        new_path = target_dir / new_folder
 
     try:
         sandbox.rename(new_path)

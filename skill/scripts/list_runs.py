@@ -24,8 +24,7 @@ def list_runs(
     run_dirs = []
     if runs_dir.exists():
         run_dirs.extend(runs_dir.iterdir())
-    if archive_dir.exists():
-        run_dirs.extend(archive_dir.iterdir())
+    run_dirs.extend(utils.iter_archive_run_dirs(archive_dir))
 
     if not run_dirs:
         return {"success": True, "total": 0, "runs": []}

@@ -168,6 +168,8 @@ def validate_team_path(path_str: str) -> dict:
     skills_dir = path / ".claude" / "skills"
     rules_dir = path / ".claude" / "rules"
 
+    entry = utils.detect_entry_point(path)
+
     result["meta"] = {
         "name": utils.parse_claude_md_title(claude_md_path) or path.name,
         "claude_md_preview": utils.parse_claude_md_preview(claude_md_path),
@@ -176,7 +178,24 @@ def validate_team_path(path_str: str) -> dict:
         "skill_count": utils.count_skills(skills_dir),
         "rule_count": utils.count_rules(rules_dir),
         "coordinator": utils.find_coordinator(agents_dir),
+        "entry_type": entry["entry_type"],
+        "entry_name": entry["entry_name"],
+        "entry_display": entry["entry_display"],
+        "entry_description": entry["entry_description"],
+        "entry_detection": entry["detection"],
+        "entry_ambiguous": entry["ambiguous"],
     }
+
+    if entry["ambiguous"]:
+        result["warnings"].append({
+            "check": "entry_ambiguous",
+            "message": f"偵測到多個可能的入口 skill，採用 {entry['entry_name']}",
+        })
+    if entry["entry_type"] == "none":
+        result["warnings"].append({
+            "check": "entry_none",
+            "message": "未偵測到指揮官 skill 或 coordinator agent，節點將以純 prompt 模式執行",
+        })
 
     return result
 
@@ -221,6 +240,14 @@ def _print_human(result: dict) -> None:
             print(f"   Coordinator: {meta['coordinator']}")
         else:
             print("   Coordinator: (未偵測到)")
+        entry_type = meta.get("entry_type", "none")
+        entry_name = meta.get("entry_name") or "(無)"
+        if entry_type == "skill":
+            print(f"   入口: /{entry_name} (skill)")
+        elif entry_type == "agent":
+            print(f"   入口: {entry_name} (agent)")
+        else:
+            print("   入口: 純 prompt 模式")
         for w in result["warnings"]:
             print(f"   ⚠️  {w['message']}")
     else:

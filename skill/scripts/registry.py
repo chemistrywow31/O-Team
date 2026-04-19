@@ -170,6 +170,10 @@ def _add_single_team(path: Path) -> dict:
         "skill_count": meta["skill_count"],
         "rule_count": meta["rule_count"],
         "coordinator": meta["coordinator"],
+        "entry_type": meta.get("entry_type", "none"),
+        "entry_name": meta.get("entry_name"),
+        "entry_display": meta.get("entry_display"),
+        "entry_detection": meta.get("entry_detection", "fallback"),
         "registered_at": utils.now_iso(),
     }
 
@@ -274,7 +278,10 @@ def update_team(slug: str, updates: dict) -> dict:
             "error": f"找不到 slug 為 '{slug}' 的團隊",
         }
 
-    allowed_fields = {"summary", "capabilities", "name"}
+    allowed_fields = {
+        "summary", "capabilities", "name",
+        "entry_type", "entry_name", "entry_display", "entry_detection",
+    }
     for key, value in updates.items():
         if key in allowed_fields:
             team[key] = value
@@ -321,6 +328,9 @@ def main():
     up_parser.add_argument("slug", help="Team slug to update")
     up_parser.add_argument("--summary", help="Team summary")
     up_parser.add_argument("--capabilities", help="Comma-separated capabilities")
+    up_parser.add_argument("--entry-type", choices=["skill", "agent", "none"],
+                            help="Override detected entry type")
+    up_parser.add_argument("--entry-name", help="Override detected entry name (skill slug or agent name)")
     up_parser.add_argument("--json", action="store_true", default=False)
 
     args = parser.parse_args()
@@ -339,6 +349,12 @@ def main():
             updates["summary"] = args.summary
         if args.capabilities:
             updates["capabilities"] = [c.strip() for c in args.capabilities.split(",")]
+        if args.entry_type:
+            updates["entry_type"] = args.entry_type
+        if args.entry_name is not None:
+            updates["entry_name"] = args.entry_name
+        if args.entry_type or args.entry_name is not None:
+            updates["entry_detection"] = "manual"
         result = update_team(args.slug, updates)
     else:
         parser.print_help()
@@ -414,6 +430,14 @@ def _print_human(command: str, result: dict) -> None:
             if caps:
                 print(f"      能力: {', '.join(caps)}")
             print(f"      Agents: {team['agent_count']}  Skills: {team.get('skill_count', 0)}  Rules: {team.get('rule_count', 0)}")
+            etype = team.get("entry_type", "none")
+            ename = team.get("entry_name") or "(無)"
+            if etype == "skill":
+                print(f"      入口: /{ename}")
+            elif etype == "agent":
+                print(f"      入口: agent → {ename}")
+            else:
+                print("      入口: 純 prompt 模式")
             print()
 
     elif command == "update":

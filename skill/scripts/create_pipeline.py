@@ -105,6 +105,8 @@ def create_pipeline(
                 "mode": mode,
                 "prompt": node.get("prompt", ""),
                 "timeout": timeout,
+                "entry_type": node.get("entry_type", team.get("entry_type", "none")),
+                "entry_name": node.get("entry_name", team.get("entry_name")),
             }
         elif has_prompt or has_prompt_file:
             # --- Prompt node ---

@@ -305,6 +305,239 @@ def count_rules(rules_dir: Path) -> int:
     return count_md_files_recursive(rules_dir)
 
 
+# ---------------------------------------------------------------------------
+# Frontmatter parsing
+# ---------------------------------------------------------------------------
+
+
+def parse_frontmatter(path: Path) -> dict:
+    """Parse YAML-style frontmatter from a .md file. Returns {} on failure."""
+    try:
+        content = read_text(path)
+    except (OSError, UnicodeDecodeError):
+        return {}
+    if not content.startswith("---"):
+        return {}
+    end = content.find("\n---", 3)
+    if end == -1:
+        return {}
+    block = content[3:end].strip()
+    result: dict = {}
+    for line in block.splitlines():
+        line = line.rstrip()
+        if not line or line.lstrip().startswith("#"):
+            continue
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            result[key] = value
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Entry-point detection (commander skill / coordinator agent)
+# ---------------------------------------------------------------------------
+
+ENTRY_SKILL_KEYWORDS = (
+    "entry point",
+    "entry-point",
+    "entrypoint",
+    "standard entry",
+    "入口",
+    "指揮官",
+    "spawns the",
+    "spawn the",
+    "launch the",
+    "launches the",
+)
+
+COORDINATOR_AGENT_HINTS = (
+    "coordinator",
+    "boss",
+    "lead",
+    "orchestrat",
+)
+
+
+def _score_entry_skill(desc: str) -> int:
+    """Score a skill description for entry-point likelihood (0 = none)."""
+    low = desc.lower()
+    score = 0
+    for kw in ENTRY_SKILL_KEYWORDS:
+        if kw in low:
+            score += 2 if kw in ("entry point", "entry-point", "入口") else 1
+    return score
+
+
+def detect_entry_skill(skills_dir: Path) -> dict:
+    """Scan .claude/skills/*/SKILL.md for a commander entry skill.
+
+    Returns dict:
+        found: bool
+        name: str | None      — skill slug (directory name)
+        display: str | None   — frontmatter name field
+        description: str | None
+        ambiguous: bool       — True if >1 plausible candidates
+        candidates: list[dict] — all scanned skills with score > 0
+    """
+    result = {
+        "found": False,
+        "name": None,
+        "display": None,
+        "description": None,
+        "ambiguous": False,
+        "candidates": [],
+    }
+    if not skills_dir.is_dir():
+        return result
+
+    scored = []
+    for d in sorted(skills_dir.iterdir()):
+        if not d.is_dir():
+            continue
+        skill_md = d / "SKILL.md"
+        if not skill_md.exists():
+            continue
+        fm = parse_frontmatter(skill_md)
+        desc = fm.get("description", "")
+        score = _score_entry_skill(desc)
+        if score > 0:
+            scored.append({
+                "slug": d.name,
+                "name": fm.get("name", d.name),
+                "description": desc,
+                "score": score,
+            })
+
+    result["candidates"] = scored
+    if not scored:
+        return result
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    top = scored[0]
+    result["found"] = True
+    result["name"] = top["slug"]
+    result["display"] = top["name"]
+    result["description"] = top["description"]
+    result["ambiguous"] = (
+        len(scored) > 1 and scored[1]["score"] == top["score"]
+    )
+    return result
+
+
+def detect_coordinator_agent(agents_dir: Path) -> dict:
+    """Find the coordinator agent (fallback when no entry skill exists).
+
+    Prefers .md files at agents/ root whose filename or frontmatter name
+    hints at coordinator/boss/lead. Falls back to the first .md at root.
+    Returns dict: found, name (frontmatter name), file (filename), description.
+    """
+    result = {
+        "found": False,
+        "name": None,
+        "file": None,
+        "description": None,
+    }
+    if not agents_dir.is_dir():
+        return result
+
+    root_mds = [
+        f for f in sorted(agents_dir.iterdir())
+        if f.suffix == ".md" and f.is_file()
+    ]
+    if not root_mds:
+        return result
+
+    def _hint_score(path: Path, fm: dict) -> int:
+        stem = path.stem.lower()
+        fname = fm.get("name", "").lower()
+        desc = fm.get("description", "").lower()
+        score = 0
+        for hint in COORDINATOR_AGENT_HINTS:
+            if hint in stem or hint in fname:
+                score += 3
+            if hint in desc:
+                score += 1
+        return score
+
+    scored = []
+    for f in root_mds:
+        fm = parse_frontmatter(f)
+        scored.append((_hint_score(f, fm), f, fm))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_score, top_file, top_fm = scored[0]
+
+    # If no hint matches, fall back to first root .md (legacy A-Team convention)
+    chosen_file, chosen_fm = (top_file, top_fm) if top_score > 0 else (
+        root_mds[0], parse_frontmatter(root_mds[0])
+    )
+
+    result["found"] = True
+    result["name"] = chosen_fm.get("name") or chosen_file.stem
+    result["file"] = chosen_file.name
+    result["description"] = chosen_fm.get("description", "")
+    return result
+
+
+def detect_entry_point(team_path: Path) -> dict:
+    """Detect how a team should be launched.
+
+    Priority:
+      1. Entry skill (/.claude/skills/<name>/SKILL.md with entry-point keywords)
+      2. Coordinator agent (.claude/agents/<name>.md at root)
+      3. None — bare prompt mode
+
+    Returns dict:
+        entry_type: "skill" | "agent" | "none"
+        entry_name: str | None — slash-command name OR agent name for Agent tool
+        entry_display: str | None — human-readable name
+        detection: "auto" | "fallback"
+        ambiguous: bool
+        skill_candidates: list
+    """
+    skills_dir = team_path / ".claude" / "skills"
+    agents_dir = team_path / ".claude" / "agents"
+
+    skill = detect_entry_skill(skills_dir)
+    if skill["found"]:
+        return {
+            "entry_type": "skill",
+            "entry_name": skill["name"],
+            "entry_display": skill["display"],
+            "entry_description": skill["description"],
+            "detection": "auto",
+            "ambiguous": skill["ambiguous"],
+            "skill_candidates": skill["candidates"],
+        }
+
+    agent = detect_coordinator_agent(agents_dir)
+    if agent["found"]:
+        return {
+            "entry_type": "agent",
+            "entry_name": agent["name"],
+            "entry_display": agent["name"],
+            "entry_description": agent["description"],
+            "entry_file": agent["file"],
+            "detection": "fallback",
+            "ambiguous": False,
+            "skill_candidates": [],
+        }
+
+    return {
+        "entry_type": "none",
+        "entry_name": None,
+        "entry_display": None,
+        "entry_description": None,
+        "detection": "fallback",
+        "ambiguous": False,
+        "skill_candidates": [],
+    }
+
+
 def copy_team_config(team_path: Path, office: Path) -> None:
     """Copy CLAUDE.md and .claude/ directory into the office folder."""
     import shutil

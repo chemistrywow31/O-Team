@@ -97,16 +97,16 @@ def human_size(size_bytes: int) -> str:
     return f"{size_bytes:.0f}TB"
 
 
-def read_entry_skill(office: Path) -> str:
-    """Read the boss entry-point skill from a team's office folder.
+def read_entry_skill(office: Path, skill_name: str = "boss") -> str:
+    """Read a commander entry-point skill from a team's office folder.
 
     Returns the skill content (frontmatter stripped) or empty string.
     """
-    boss_skill = office / ".claude" / "skills" / "boss" / "SKILL.md"
-    if not boss_skill.exists():
+    skill_md = office / ".claude" / "skills" / skill_name / "SKILL.md"
+    if not skill_md.exists():
         return ""
     try:
-        content = boss_skill.read_text(encoding="utf-8").strip()
+        content = skill_md.read_text(encoding="utf-8").strip()
         # Strip YAML frontmatter
         if content.startswith("---"):
             end = content.find("---", 3)
@@ -156,7 +156,15 @@ def assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
     office = sandbox / node["id"]
     workspace = sandbox / "workspace"
     is_team_node = bool(node.get("team"))
+    entry_type = node.get("entry_type", "none") if is_team_node else "none"
+    entry_name = node.get("entry_name") if is_team_node else None
     parts = []
+
+    # Slash-command entry: first line dispatches to the team's commander skill.
+    # Worker claude auto-registers the copied .claude/skills/ so /<name> resolves.
+    if entry_type == "skill" and entry_name:
+        parts.append(f"/{entry_name}")
+        parts.append("")
 
     # Header
     if is_team_node:
@@ -223,18 +231,33 @@ def assemble_prompt(node: dict, sandbox: Path, is_first_node: bool) -> str:
                 except Exception:
                     pass
 
-    # Entry skill injection (team nodes only)
+    # Entry-point dispatch (team nodes only). Branches on entry_type:
+    #   - skill: slash command already prepended at top; nothing extra needed
+    #   - agent: instruct worker claude to spawn the coordinator via Agent tool
+    #   - none:  legacy behaviour — fall back to reading boss/SKILL.md as text
     if is_team_node:
-        entry_skill = read_entry_skill(office)
-        if entry_skill:
+        if entry_type == "agent" and entry_name:
             parts.append("## Entry Workflow")
             parts.append("")
-            parts.append("Follow this workflow to execute the team's full process:")
+            parts.append(
+                f"Spawn the coordinator via the Agent tool: "
+                f'subagent_type="{entry_name}" (model: opus). '
+                "Pass the task defined in the Instructions section as the agent's prompt. "
+                "Do not execute the workflow yourself — delegate to the coordinator."
+            )
             parts.append("")
-            parts.append("<entry_skill>")
-            parts.append(entry_skill)
-            parts.append("</entry_skill>")
-            parts.append("")
+        elif entry_type == "none":
+            # Legacy path: read boss skill text if present (backward-compat)
+            entry_skill = read_entry_skill(office)
+            if entry_skill:
+                parts.append("## Entry Workflow")
+                parts.append("")
+                parts.append("Follow this workflow to execute the team's full process:")
+                parts.append("")
+                parts.append("<entry_skill>")
+                parts.append(entry_skill)
+                parts.append("</entry_skill>")
+                parts.append("")
 
     # Node-specific instructions
     prompt_text = resolve_prompt_text(node)
